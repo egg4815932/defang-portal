@@ -2,11 +2,31 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- viewport-fit=cover：內容延伸到瀏海／圓角區，全螢幕時邊緣才不會留一圈 -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>德芳連鎖藥局 內部查詢系統</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%92%8A%3C/text%3E%3C/svg%3E">
+
+<!-- ========== PWA：讓「加到主畫面」變成獨立視窗 App，而不是開瀏覽器的捷徑 ==========
+     ⚠ 差別全在這幾行。少了它們，「加到主畫面」只是一個書籤捷徑 ——
+        點下去照樣用瀏覽器開，網址列、工具列一條都不會少。
+     ・iOS 只認 apple-mobile-web-app-capable，完全不吃 manifest 的 display
+     ・Android 只認 manifest 的 display / orientation
+     兩邊都要寫，才會兩邊都全螢幕。
+     ⚠ 改了這些之後，舊的主畫面圖示不會自動升級 —— 必須先刪掉、重新加一次。 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2B7E43">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="德芳查詢">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+
 <style>
-  html,body{margin:0;height:100%;background:#fff}
+  /* 底色從白色改成品牌漸層：全螢幕時 iframe 以外露出的部分才不會是刺眼的白（深色模式下是黑） */
+  html,body{margin:0;height:100%;
+    background:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%)}
+  /* dvh 才抓得到「當下真正看得到的高度」——手機網址列收放時視窗高度是會變的 */
+  @supports (height:100dvh){ html,body{height:100dvh} }
   iframe{display:block;width:100%;height:100%;border:0}
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
