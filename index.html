@@ -3,14 +3,10 @@
 <head>
 <meta charset="utf-8">
 <!-- viewport-fit=cover：內容延伸到瀏海／圓角區，全螢幕時邊緣才不會留一圈
-     initial-scale=0.8：手機上整個系統顯示 80%（layout viewport 變 device-width/0.8，914→1143）。
-     ⚠ 這一行必須寫在「最外層文件」也就是這裡才算數。GAS 的 doGet 與 index.html 那兩層
-       都在 iframe 內，viewport meta 一律被忽略 —— 2026-08-02 把 0.8 寫在 index.html，
-       實機量出來仍是 scale 1（用 logo 238px、登入卡 492px 兩個基準回推 dpr 2.63 → viewport 914），
-       等於白改。跟 viewport-fit 只有最外層算數是同一條規則。
-     ⚠ 只有行動裝置會讀 viewport meta，桌機瀏覽器一律忽略＝電腦版不受影響。
-     ⚠ 改這裡的數字要順便看下面 SCALE 那段（全螢幕判斷會用到），它自己會讀，不必手動同步。 -->
-<meta name="viewport" content="width=device-width,initial-scale=0.8,viewport-fit=cover">
+     ⛔ initial-scale 刻意保持 1 —— 「手機顯示 80%」已經改由下面的 --app-scale（CSS transform）負責。
+        原因見下方那段註解：initial-scale 一進全螢幕就會被 Chrome 作廢。
+     ⚠ 只有行動裝置會讀 viewport meta，桌機瀏覽器一律忽略。 -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>德芳連鎖藥局 內部查詢系統</title>
 
 <!-- ========== PWA：讓「加到主畫面」變成獨立視窗 App，而不是開瀏覽器的捷徑 ==========
@@ -35,6 +31,35 @@
   /* dvh 才抓得到「當下真正看得到的高度」——手機網址列收放時視窗高度是會變的 */
   @supports (height:100dvh){ html,body{height:100dvh} }
   iframe{display:block;width:100%;height:100%;border:0}
+
+  /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
+     ⛔ 為什麼不能用 <meta viewport initial-scale=0.8>：
+        **Chrome 一進 Fullscreen API 就把 page scale 強制重設成 1**，那行 meta 當場作廢。
+        使用者的症狀就是這個 —— 登入頁還是 80%，一按下去（碰畫面→我們補全螢幕）就跳回 100%。
+        可控實驗（headless + mobile 模擬，螢幕 914dp）：
+          全螢幕前 innerWidth 1142 (scale .8) → 進全螢幕 914 (scale 1) → 退出又回 1142。
+          外層殼頁請求、或 GAS iframe 內請求，兩種都一樣會被重設。
+        而我們為了吃回挖孔那 41px（見下面那段）**一定得進全螢幕** → 兩件事天生互斥，只能換做法。
+
+     ✅ 改成對 iframe 做 CSS transform：版面先放大 1/0.8 再 scale(.8) 縮回來。
+        iframe 內的 layout viewport ＝ 914/0.8 ＝ 1142 CSS px，與 initial-scale=0.8 效果相同，
+        但它是 CSS，page scale 怎麼被重設都影響不到。
+
+     ⚠ 這跟「同一份文件裡用 CSS zoom」是兩回事，不會弄壞 index.html 的假旋轉座標換算 ——
+       iframe 內部 innerWidth 與 clientX 同時都是 1142 那個座標系，內部完全無感。
+     ⚠ 只在 pointer:coarse 套用：桌機本來就忽略 viewport meta＝電腦版行為維持不變。
+     要調整比例只改 --app-scale 這一個數字。 */
+  :root{ --app-scale:.8 }
+  @media (pointer: coarse){
+    /* iframe 版面比視窗大，不讓殼頁自己長出捲軸 */
+    html,body{ overflow:hidden }
+    iframe{
+      width:calc(100% / var(--app-scale));
+      height:calc(100% / var(--app-scale));
+      transform:scale(var(--app-scale));
+      transform-origin:0 0;
+    }
+  }
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
   /* 自動進全螢幕失敗時才亮出來的備援鈕（順利的話使用者永遠看不到它） */
@@ -78,10 +103,11 @@
   if (!el.requestFullscreen) return;                  // iPhone 從這裡離開
 
   /* 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示。
-     ⚠ innerWidth 的單位是 CSS px，會被 <meta viewport> 的 initial-scale 放大
-       （0.8 時 874dp 的視窗回報成 1092），而 screen.width 一律是 dp ——
+     ⚠ initial-scale 現在固定是 1（80% 改由 CSS 的 --app-scale 負責），SCALE 讀出來就是 1，
+       innerWidth 本身已經是 dp、可以直接比。這段換算留著是防呆：萬一日後有人又把
+       initial-scale 改成非 1，innerWidth 會被放大成 CSS px，而 screen.width 一律是 dp ——
        兩者直接相減會變負數 → 這裡就 return，整段全螢幕（＝挖孔那 41px）默默失效。
-       所以先把 innerWidth 乘回 SCALE 換算成 dp 再比。SCALE 直接讀上面那行 meta，不必手動同步。
+       它自己會讀上面那行 meta，不必手動同步。
      ⚠ 桌機瀏覽器根本不讀 viewport meta，innerWidth 沒有被放大過，硬乘 0.8 會讓「視窗沒最大化」
        被誤判成「視窗被切掉」而跑去請求全螢幕。所以只有行動裝置才套 SCALE，桌機維持原樣。 */
   var vp = document.querySelector('meta[name=viewport]');
@@ -91,15 +117,22 @@
   if (Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
   var btn = document.getElementById('fsFallback');
-  var timer = null, tries = 0;
+  var timer = null, 起點 = 0;
 
   function go() {
     return el.requestFullscreen({ navigationUI: 'hide' })['catch'](function () {});
   }
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
-  function start() { stop(); tries = 0; timer = setInterval(tick, 500); }
+  /* ⚠ 間隔要短（200ms 不是 500ms）：GAS 那層的 index.html 在「按下登入的當下」也會呼叫
+     一次 openFullscreen()，它若搶在我們前面，全螢幕元素會變成整個 GAS iframe（top layer），
+     上面 --app-scale 的 transform 當場失效＝畫面跳回 100%。
+     我們先進全螢幕的話，index.html 的 已是App全螢幕() 守門會讀到 (display-mode: fullscreen)
+     ＝true 而自己 return（跨兩層 iframe 也讀得到，2026-08-03 用三層跨域探針實測過）。
+     門檻改用「經過的毫秒」而不是次數，日後再調間隔也不必重算。 */
+  function start() { stop(); 起點 = Date.now(); timer = setInterval(tick, 200); }
 
   function tick() {
+    var 已過 = Date.now() - 起點;
     if (document.fullscreenElement) { stop(); btn.style.display = 'none'; return; }
 
     /* 使用者碰到的是 GAS 那個跨網域 iframe，殼頁收不到任何事件；
@@ -109,8 +142,8 @@
     if (ua && ua.isActive) go();
 
     // 自動這條路走不通時（人明明碰過卻始終進不去）才亮備援鈕，順利的話不會出現
-    if (tries > 16 && (!ua || ua.hasBeenActive)) btn.style.display = 'block';
-    if (++tries > 600) stop();                        // 5 分鐘後收工，不要無限輪詢耗電
+    if (已過 > 8000 && (!ua || ua.hasBeenActive)) btn.style.display = 'block';
+    if (已過 > 300000) stop();                        // 5 分鐘後收工，不要無限輪詢耗電
   }
 
   btn.addEventListener('click', function () { go(); });
