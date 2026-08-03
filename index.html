@@ -2,8 +2,15 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<!-- viewport-fit=cover：內容延伸到瀏海／圓角區，全螢幕時邊緣才不會留一圈 -->
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- viewport-fit=cover：內容延伸到瀏海／圓角區，全螢幕時邊緣才不會留一圈
+     initial-scale=0.8：手機上整個系統顯示 80%（layout viewport 變 device-width/0.8，914→1143）。
+     ⚠ 這一行必須寫在「最外層文件」也就是這裡才算數。GAS 的 doGet 與 index.html 那兩層
+       都在 iframe 內，viewport meta 一律被忽略 —— 2026-08-02 把 0.8 寫在 index.html，
+       實機量出來仍是 scale 1（用 logo 238px、登入卡 492px 兩個基準回推 dpr 2.63 → viewport 914），
+       等於白改。跟 viewport-fit 只有最外層算數是同一條規則。
+     ⚠ 只有行動裝置會讀 viewport meta，桌機瀏覽器一律忽略＝電腦版不受影響。
+     ⚠ 改這裡的數字要順便看下面 SCALE 那段（全螢幕判斷會用到），它自己會讀，不必手動同步。 -->
+<meta name="viewport" content="width=device-width,initial-scale=0.8,viewport-fit=cover">
 <title>德芳連鎖藥局 內部查詢系統</title>
 
 <!-- ========== PWA：讓「加到主畫面」變成獨立視窗 App，而不是開瀏覽器的捷徑 ==========
@@ -70,8 +77,18 @@
   var el = document.documentElement;
   if (!el.requestFullscreen) return;                  // iPhone 從這裡離開
 
-  // 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示
-  if (Math.round(screen.width - window.innerWidth) <= 1) return;
+  /* 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示。
+     ⚠ innerWidth 的單位是 CSS px，會被 <meta viewport> 的 initial-scale 放大
+       （0.8 時 874dp 的視窗回報成 1092），而 screen.width 一律是 dp ——
+       兩者直接相減會變負數 → 這裡就 return，整段全螢幕（＝挖孔那 41px）默默失效。
+       所以先把 innerWidth 乘回 SCALE 換算成 dp 再比。SCALE 直接讀上面那行 meta，不必手動同步。
+     ⚠ 桌機瀏覽器根本不讀 viewport meta，innerWidth 沒有被放大過，硬乘 0.8 會讓「視窗沒最大化」
+       被誤判成「視窗被切掉」而跑去請求全螢幕。所以只有行動裝置才套 SCALE，桌機維持原樣。 */
+  var vp = document.querySelector('meta[name=viewport]');
+  var m = vp && /initial-scale\s*=\s*([\d.]+)/.exec(vp.content);
+  var 行動裝置 = matchMedia('(pointer: coarse)').matches;
+  var SCALE = (行動裝置 && m) ? parseFloat(m[1]) : 1;
+  if (Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
   var btn = document.getElementById('fsFallback');
   var timer = null, tries = 0;
