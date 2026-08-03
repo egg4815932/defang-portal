@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>自製鍵盤 — 按壓回饋選型（動畫 / 音效 / 震動）</title>
+<style>
+/* 品牌 token：直接沿用 gas/index.html 的 :root，不另外發明 */
+:root{
+  --mint:#83CF8F; --mint-l:#A7DFAF; --mint-x:#D5F0DA;
+  --btn:#2B7E43; --btn-d:#256E3A; --ink:#1E4229; --sub:#5C8A6B;
+  --glass:rgba(255,255,255,0.55); --gbd:rgba(255,255,255,0.85);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+  color:var(--ink); -webkit-text-size-adjust:100%;
+  background:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%);
+  background-attachment:fixed; min-height:100vh;
+}
+.page{max-width:1040px;margin:0 auto;padding:0 14px 60px}
+
+/* ── 頂部固定摘要列：隨時看得到目前選了什麼，方便直接回報編號 ── */
+.bar{position:sticky;top:0;z-index:20;margin:0 -14px 16px;padding:10px 14px;
+  background:rgba(255,255,255,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--gbd);box-shadow:0 2px 14px rgba(35,105,60,.10)}
+.bar h1{margin:0 0 6px;font-size:16px;letter-spacing:2px;white-space:nowrap}
+.picks{display:flex;flex-wrap:wrap;gap:6px}
+.pick{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:5px 11px;border-radius:999px;font-size:13px;font-weight:700;
+  background:var(--mint-x);border:1px solid var(--mint);color:var(--ink)}
+.pick b{color:var(--btn);font-size:14px}
+.pick.none{background:#fff;border-color:#ddd;color:#999}
+
+h2{margin:26px 0 4px;font-size:17px;letter-spacing:2px;white-space:nowrap;
+  display:flex;align-items:center;gap:10px}
+h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(30,66,41,.28),transparent)}
+.hint{margin:0 0 12px;font-size:13px;line-height:1.75;color:var(--sub)}
+.hint b{color:var(--btn)}
+
+/* ── 選項卡片：整張都可按，按下＝試 + 選 ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:10px}
+.card{position:relative;padding:12px 10px 11px;border-radius:14px;cursor:pointer;
+  background:var(--glass);border:1.5px solid var(--gbd);text-align:center;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:0 2px 10px rgba(35,105,60,.08);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent}
+.card.on{border-color:var(--btn);box-shadow:0 0 0 3px rgba(43,126,67,.16),0 2px 10px rgba(35,105,60,.12)}
+.card .no{position:absolute;top:7px;left:9px;font-size:12px;font-weight:800;color:var(--sub)}
+.card .tick{position:absolute;top:6px;right:8px;font-size:13px;color:var(--btn);display:none}
+.card.on .tick{display:block}
+.card .nm{margin-top:6px;font-size:14.5px;font-weight:700;white-space:nowrap}
+/* text-wrap:balance 讓兩行的描述平均分配，不會出現「散」「人」單字落單的難看斷行 */
+.card .ds{margin-top:3px;font-size:11.5px;line-height:1.5;color:var(--sub);text-wrap:balance}
+
+/* ══ 鍵帽：完全照抄 gas/index.html 的 .kbk，才試得準 ══ */
+.kbk{height:48px;min-width:58px;display:inline-flex;align-items:center;justify-content:center;
+  font-family:inherit;font-size:19px;font-weight:700;padding:0 4px;color:var(--ink);
+  background:linear-gradient(180deg,#fff 0%,#EAF7ED 100%);
+  border:1px solid rgba(131,207,143,.55);border-radius:13px;
+  box-shadow:0 2px 5px rgba(35,105,60,.12),inset 0 1px 0 #fff;
+  cursor:pointer;white-space:nowrap;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.kbk.big{min-width:74px;height:54px;font-size:21px}
+
+/* ══════════ 按壓動畫 10 變體 ══════════
+   共同做法：pointerdown 立刻加 .press（快），0.2 秒後移除、用各自的曲線彈回來。
+   :active 不夠用——手指一放開就復原，而一次點擊只有 ~80ms，根本看不見。 */
+.kbk{transition:transform .19s cubic-bezier(.22,1.2,.36,1),
+                box-shadow .19s ease, background .19s ease, border-color .19s ease, color .19s ease}
+.kbk.press{transition-duration:.045s,.045s,.045s,.045s,.045s;
+           transition-timing-function:ease-out}
+
+/* 1 深壓凹陷：往下沉 + 縮一點 + 內陰影（最接近「凹進去」的直覺） */
+.v1 .kbk.press{transform:translateY(3px) scale(.955);
+  background:linear-gradient(180deg,#D5F0DA,#A7DFAF);
+  box-shadow:inset 0 3px 7px rgba(35,105,60,.34),0 0 0 rgba(0,0,0,0)}
+/* 2 彈簧回彈：壓得深，放開時彈過頭一點點再定位 */
+.v2 .kbk{transition:transform .3s cubic-bezier(.18,1.7,.42,1),box-shadow .2s,background .2s}
+.v2 .kbk.press{transform:translateY(4px) scale(.93);
+  background:linear-gradient(180deg,#C6EACD,#9BD9A6);
+  box-shadow:inset 0 4px 9px rgba(35,105,60,.36)}
+/* 3 實體鍵：鍵帽下沉、底下的投影同時被壓扁（像真的按到桌面） */
+.v3 .kbk{box-shadow:0 4px 0 #A7DFAF,0 5px 8px rgba(35,105,60,.20)}
+.v3 .kbk.press{transform:translateY(4px);box-shadow:0 0 0 #A7DFAF,0 1px 3px rgba(35,105,60,.26);
+  background:linear-gradient(180deg,#EAF7ED,#C6EACD)}
+/* 4 縮放脈衝：只縮不沉，回彈時輕輕放大一下 */
+.v4 .kbk{transition:transform .26s cubic-bezier(.2,1.55,.4,1),background .2s}
+.v4 .kbk.press{transform:scale(.86);background:linear-gradient(180deg,#D5F0DA,#A7DFAF)}
+/* 5 水波擴散：Material 風，中心薄荷圓擴散後淡出 */
+.v5 .kbk{position:relative;overflow:hidden}
+.v5 .kbk::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;
+  margin:-6px 0 0 -6px;border-radius:50%;background:rgba(43,126,67,.38);
+  transform:scale(0);opacity:0}
+.v5 .kbk.press{transform:translateY(2px)}
+.v5 .kbk.press::after{animation:rip .42s ease-out}
+@keyframes rip{0%{transform:scale(0);opacity:.75}100%{transform:scale(9);opacity:0}}
+/* 6 邊框聚焦：不太動位置，改用主色描邊＋外圈光暈（安靜、不晃） */
+.v6 .kbk.press{transform:translateY(1px);border-color:var(--btn);
+  box-shadow:0 0 0 3px rgba(43,126,67,.22),inset 0 2px 5px rgba(35,105,60,.18);
+  background:linear-gradient(180deg,#fff,#D5F0DA)}
+/* 7 3D 前傾：鍵帽像被指尖壓得往前倒 */
+#tryPad.v7,.v7 .cardKey{perspective:420px}   /* ⚠ 試打區的 v7 掛在 #tryPad 自己身上，不是後代 */
+.v7 .kbk{transform-style:preserve-3d}
+.v7 .kbk.press{transform:translateY(2px) rotateX(22deg) scale(.97);
+  box-shadow:0 1px 3px rgba(35,105,60,.3),inset 0 -3px 6px rgba(35,105,60,.16);
+  background:linear-gradient(180deg,#E2F5E7,#B8E3C1)}
+/* 8 重壓深沉：沉最多，適合喜歡「扎實」手感的人 */
+.v8 .kbk{transition:transform .22s cubic-bezier(.2,1.25,.4,1),box-shadow .22s,background .22s}
+.v8 .kbk.press{transform:translateY(6px) scaleY(.9);
+  background:linear-gradient(180deg,#B8E3C1,#8FD29C);
+  box-shadow:inset 0 5px 11px rgba(30,66,41,.4)}
+/* 9 主色填滿：整顆變品牌綠白字，最明顯、遠遠也看得到按到哪 */
+.v9 .kbk.press{transform:translateY(2px) scale(.96);color:#fff;border-color:var(--btn-d);
+  background:linear-gradient(180deg,var(--btn),var(--btn-d));
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.25);text-shadow:0 1px 1px rgba(0,0,0,.2)}
+/* 10 雙段回彈：沉下去→彈過頭→定位，用 keyframes 跑完整段 */
+.v10 .kbk.press{animation:dbl .46s cubic-bezier(.3,1,.4,1);
+  background:linear-gradient(180deg,#D5F0DA,#A7DFAF)}
+@keyframes dbl{
+  0%{transform:translateY(0) scale(1)}
+  14%{transform:translateY(5px) scale(.92)}
+  46%{transform:translateY(-3px) scale(1.04)}
+  72%{transform:translateY(1px) scale(.99)}
+  100%{transform:translateY(0) scale(1)}
+}
+
+.cardKey{margin:2px 0 2px;display:flex;justify-content:center}
+
+/* ── 震動 / 音量 控制列 ── */
+.rowset{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* ⚠ 不用「連在一起的段選」：5 個中文選項在 375px 寬一定塞不下而溢出畫面。
+   改成各自獨立的膠囊 + flex-wrap，窄螢幕自動折行。 */
+.seg{display:flex;flex-wrap:wrap;gap:7px}
+.seg button{font-family:inherit;font-size:14px;font-weight:700;color:var(--ink);
+  padding:9px 14px;cursor:pointer;white-space:nowrap;touch-action:manipulation;
+  border:1.5px solid var(--mint);border-radius:999px;background:rgba(255,255,255,.65);
+  -webkit-tap-highlight-color:transparent}
+.seg button.on{background:linear-gradient(180deg,var(--btn),var(--btn-d));color:#fff;
+  border-color:var(--btn-d)}
+@media (max-width:420px){ .seg button{padding:8px 11px;font-size:13px} }
+.slid{display:flex;align-items:center;gap:9px;white-space:nowrap;font-size:14px;font-weight:700}
+input[type=range]{width:150px;accent-color:var(--btn)}
+.note{margin:9px 0 0;font-size:12.5px;line-height:1.7;color:var(--sub)}
+.warn{color:#A5502A;font-weight:700}
+
+/* ── 試打區 ── */
+#tryWrap{margin-top:12px;padding:14px 12px 16px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(234,247,237,.9),rgba(213,240,218,.95));
+  border:1.5px solid var(--gbd);box-shadow:0 -4px 18px rgba(35,105,60,.10)}
+#tryOut{min-height:34px;margin:0 auto 12px;max-width:460px;padding:7px 13px;border-radius:12px;
+  background:rgba(255,255,255,.85);border:1.5px solid var(--mint);
+  font-size:18px;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-align:left;
+  direction:rtl;text-overflow:ellipsis}
+#tryPad{display:flex;justify-content:center;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.padL{display:flex;flex-direction:column;gap:5px}
+.padRow{display:flex;gap:5px;justify-content:center}
+.padRow.ind{margin-left:27.5px}
+.padN{display:grid;grid-template-columns:repeat(4,auto);gap:5px}
+.padL .kbk{min-width:50px;font-size:17px}
+.kbk.num{background:linear-gradient(180deg,#fff,#D5F0DA);border-color:var(--mint)}
+.kbk.entk{color:#fff;font-size:15px;letter-spacing:1px;border-color:rgba(30,66,41,.45);
+  background:linear-gradient(180deg,var(--btn),var(--btn-d));text-shadow:0 1px 1px rgba(0,0,0,.18)}
+.v9 .kbk.entk.press{background:linear-gradient(180deg,#1E4229,#14311c)}
+.foot{margin-top:22px;padding:13px 15px;border-radius:14px;background:rgba(255,255,255,.6);
+  border:1.5px solid var(--gbd);font-size:13.5px;line-height:1.85}
+.foot b{color:var(--btn)}
+@media (max-width:400px){ .padL .kbk{min-width:8.4vw;font-size:15px} }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="bar">
+  <h1>自製鍵盤 · 按壓回饋選型</h1>
+  <div class="picks">
+    <span class="pick none" id="pkA">動畫 <b>未選</b></span>
+    <span class="pick none" id="pkS">音效 <b>未選</b></span>
+    <span class="pick" id="pkV">震動 <b>15ms</b></span>
+  </div>
+</div>
+
+<h2>① 按壓動畫（10 選 1）</h2>
+<p class="hint">
+  每張卡片上的鍵帽<b>直接按下去試</b>，按了就同時選定。<br>
+  三種都是「按下立刻凹下去 → <b>撐住 0.2 秒</b> → 用各自的曲線彈回來」，差別在沉多深、彈多兇、有沒有變色。
+</p>
+<div class="grid" id="gridA"></div>
+
+<h2>② 按鍵音效（10 選 1）</h2>
+<p class="hint">
+  一樣按鍵帽試聽。全部是<b>程式即時合成</b>的（不抓外部音檔，離線與 GAS 沙盒內都能用）。<br>
+  <span class="warn">⚠ iPhone 開靜音開關時聽不到</span>（Web Audio 走鈴聲通道）；Android 不受影響。
+</p>
+<div class="rowset" style="margin-bottom:11px">
+  <span class="slid">音量 <input type="range" id="vol" min="0" max="100" value="55"><b id="volTxt">55</b></span>
+</div>
+<div class="grid" id="gridS"></div>
+
+<h2>③ 震動強度</h2>
+<p class="hint">網頁只能控制<b>時間長短</b>，控制不了強弱；越短越像「輕輕一頓」。</p>
+<div class="rowset">
+  <div class="seg" id="segV">
+    <button data-v="0">關閉</button>
+    <button data-v="8">8ms 極輕</button>
+    <button data-v="15" class="on">15ms 標準</button>
+    <button data-v="25">25ms 明顯</button>
+    <button data-v="40">40ms 重</button>
+  </div>
+</div>
+<p class="note" id="vibNote"></p>
+
+<h2>④ 試打區（三樣一起感受）</h2>
+<p class="hint">用你目前選的組合連續打字看看 —— 單看一顆和實際連打的感覺差很多。</p>
+<div id="tryWrap">
+  <div id="tryOut"></div>
+  <div id="tryPad">
+    <div class="padL">
+      <div class="padRow" data-r="QWERTYUIOP"></div>
+      <div class="padRow ind" data-r="ASDFGHJKL"></div>
+      <div class="padRow" data-r="ZXCVBNM"></div>
+    </div>
+    <div class="padN" id="padN"></div>
+  </div>
+</div>
+
+<div class="foot">
+  選好之後<b>回報兩個編號</b>給我就行，例如「<b>動畫 3、音效 7、震動 15ms</b>」，我就接到正式鍵盤上。<br>
+  <span id="cap"></span>
+</div>
+
+</div>
+
+<script>
+/* ══════════ 音效：全部用 Web Audio 即時合成，不依賴任何音檔 ══════════ */
+var AC = null, MASTER = null, NOISE = null;
+function ac(){
+  if (!AC){
+    var C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    AC = new C();
+    MASTER = AC.createGain();
+    MASTER.gain.value = 0.55;
+    MASTER.connect(AC.destination);
+  }
+  if (AC.state === 'suspended') AC.resume();   // iOS/Chrome 必須在使用者手勢中 resume
+  return AC;
+}
+function noise(c){
+  if (!NOISE){
+    var n = Math.floor(c.sampleRate * 0.3);
+    NOISE = c.createBuffer(1, n, c.sampleRate);
+    var d = NOISE.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  var s = c.createBufferSource(); s.buffer = NOISE; return s;
+}
+function env(g, t, atk, dec, peak){
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + atk + dec);
+}
+function tone(c, t, type, f0, f1, atk, dec, peak){
+  var o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + atk + dec);
+  env(g, t, atk, dec, peak);
+  o.connect(g); g.connect(MASTER);
+  o.start(t); o.stop(t + atk + dec + 0.02);
+}
+function burst(c, t, type, freq, q, dec, peak){
+  var s = noise(c), f = c.createBiquadFilter(), g = c.createGain();
+  f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
+  env(g, t, 0.001, dec, peak);
+  s.connect(f); f.connect(g); g.connect(MASTER);
+  s.start(t); s.stop(t + dec + 0.03);
+}
+
+var SOUNDS = [
+  { n:'經典打字機', d:'噠一聲＋低沉尾音，最有「在打字」的感覺',
+    f:function(c,t){ burst(c,t,'bandpass',2400,1.1,0.035,0.55); tone(c,t,'sine',170,95,0.002,0.06,0.30); } },
+  { n:'iPhone 清脆', d:'極短高頻，乾淨不拖泥帶水',
+    f:function(c,t){ burst(c,t,'highpass',3200,0,0.016,0.5); tone(c,t,'sine',1500,1100,0.001,0.02,0.14); } },
+  { n:'Gboard 柔和', d:'圓潤的小 tick，連打不吵',
+    f:function(c,t){ tone(c,t,'sine',820,640,0.003,0.045,0.24); burst(c,t,'lowpass',1400,0,0.02,0.12); } },
+  { n:'機械鍵盤 青軸', d:'兩段咔噠，最有存在感',
+    f:function(c,t){ burst(c,t,'bandpass',3600,2.2,0.014,0.55);
+                     burst(c,t+0.028,'bandpass',2300,2,0.012,0.34);
+                     tone(c,t,'sine',210,130,0.002,0.05,0.18); } },
+  { n:'木魚／竹敲', d:'溫潤的木質共鳴，不刺耳',
+    f:function(c,t){ burst(c,t,'bandpass',760,11,0.075,0.7); tone(c,t,'triangle',430,300,0.002,0.07,0.13); } },
+  { n:'水滴', d:'音高往下滑，輕巧俏皮',
+    f:function(c,t){ tone(c,t,'sine',1500,430,0.003,0.1,0.34); burst(c,t,'highpass',4000,0,0.012,0.16); } },
+  { n:'泡泡 Pop', d:'音高往上彈，最可愛',
+    f:function(c,t){ tone(c,t,'sine',320,980,0.004,0.055,0.36); } },
+  { n:'薄荷玻璃鈴', d:'品牌感最搭：透明的小鈴音',
+    f:function(c,t){ tone(c,t,'triangle',1760,1740,0.002,0.22,0.16);
+                     tone(c,t,'triangle',2640,2620,0.002,0.16,0.08);
+                     burst(c,t,'highpass',5000,0,0.01,0.1); } },
+  { n:'電子嗶', d:'方波短嗶，像舊式終端機',
+    f:function(c,t){ tone(c,t,'square',980,980,0.002,0.04,0.16); } },
+  { n:'低沉鼓點', d:'只有低頻，安靜場合最不擾人',
+    f:function(c,t){ tone(c,t,'sine',150,58,0.003,0.1,0.5); burst(c,t,'lowpass',400,0,0.02,0.1); } }
+];
+
+var ANIMS = [
+  { n:'深壓凹陷',   d:'往下沉＋內陰影，最直覺的「凹進去」' },
+  { n:'彈簧回彈',   d:'壓得深，放開時彈過頭一點再定位' },
+  { n:'實體鍵',     d:'鍵帽下沉、底下投影同時被壓扁' },
+  { n:'縮放脈衝',   d:'只縮不沉，回彈時輕輕放大' },
+  { n:'水波擴散',   d:'Material 風，中心薄荷圓擴散' },
+  { n:'邊框聚焦',   d:'幾乎不移動，改用主色描邊＋光暈' },
+  { n:'3D 前傾',    d:'鍵帽像被指尖壓得往前倒' },
+  { n:'重壓深沉',   d:'沉最多，扎實但幅度大' },
+  { n:'主色填滿',   d:'整顆變品牌綠白字，最明顯' },
+  { n:'雙段回彈',   d:'沉下去→彈過頭→定位，最有彈性' }
+];
+
+/* ══════════ 狀態 ══════════ */
+var 選動畫 = 0, 選音效 = 0, 震動 = 15;     // 0 = 尚未選
+var HOLD = 200;                            // ⚠ 使用者指定：凹下去撐住 0.2 秒再彈回
+
+function 震一下(){
+  if (!震動 || !navigator.vibrate) return;
+  try { navigator.vibrate(震動); } catch (e) {}
+}
+function 播(i){
+  var c = ac(); if (!c || !i) return;
+  try { SOUNDS[i-1].f(c, c.currentTime + 0.001); } catch (e) {}
+}
+/* 按下立刻加 .press，撐滿 HOLD 再移除 —— :active 在手指放開的瞬間就沒了，看不見 */
+function 壓(el){
+  el.classList.add('press');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove('press'); }, HOLD);
+}
+
+function 更新摘要(){
+  var a = document.getElementById('pkA'), s = document.getElementById('pkS');
+  a.className = 'pick' + (選動畫 ? '' : ' none');
+  a.innerHTML = '動畫 <b>' + (選動畫 ?選動畫 + '　' + ANIMS[選動畫-1].n : '未選') + '</b>';
+  s.className = 'pick' + (選音效 ? '' : ' none');
+  s.innerHTML = '音效 <b>' + (選音效 ? 選音效 + '　' + SOUNDS[選音效-1].n : '未選') + '</b>';
+  document.getElementById('pkV').innerHTML = '震動 <b>' + (震動 ? 震動 + 'ms' : '關閉') + '</b>';
+}
+
+/* ══════════ 建卡片 ══════════ */
+function 卡(no, nm, ds, cls){
+  var d = document.createElement('div');
+  d.className = 'card' + (cls ? ' ' + cls : '');
+  d.innerHTML = '<span class="no">' + no + '</span><span class="tick">✔</span>' +
+                '<div class="cardKey"><button type="button" class="kbk big">A</button></div>' +
+                '<div class="nm"></div><div class="ds"></div>';
+  d.querySelector('.nm').textContent = nm;
+  d.querySelector('.ds').textContent = ds;
+  return d;
+}
+var gA = document.getElementById('gridA');
+ANIMS.forEach(function(a, i){
+  var no = i + 1;
+  var c = 卡(no, a.n, a.d, 'v' + no);           // 卡片自己帶 vN，鍵帽就是該變體的樣子
+  c.addEventListener('pointerdown', function(){
+    選動畫 = no;
+    [].forEach.call(gA.children, function(x){ x.classList.remove('on'); });
+    c.classList.add('on');
+    壓(c.querySelector('.kbk')); 震一下(); 播(選音效);
+    更新摘要(); 套用試打區();
+  });
+  gA.appendChild(c);
+});
+var gS = document.getElementById('gridS');
+SOUNDS.forEach(function(s, i){
+  var no = i + 1;
+  var c = 卡(no, s.n, s.d);
+  c.addEventListener('pointerdown', function(){
+    選音效 = no;
+    [].forEach.call(gS.children, function(x){ x.classList.remove('on'); });
+    c.classList.add('on');
+    播(no); 震一下(); 壓(c.querySelector('.kbk'));
+    更新摘要(); 套用試打區();
+  });
+  gS.appendChild(c);
+});
+
+/* ══════════ 震動段選 ══════════ */
+var segV = document.getElementById('segV');
+segV.addEventListener('click', function(e){
+  var b = e.target.closest('button'); if (!b) return;
+  震動 = parseInt(b.dataset.v, 10);
+  [].forEach.call(segV.children, function(x){ x.classList.remove('on'); });
+  b.classList.add('on');
+  震一下(); 更新摘要();
+});
+
+/* ══════════ 試打區 ══════════ */
+var out = document.getElementById('tryOut'), pad = document.getElementById('tryPad');
+document.querySelectorAll('.padRow').forEach(function(r){
+  r.dataset.r.split('').forEach(function(ch){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'kbk'; b.textContent = ch; b.dataset.k = ch;
+    r.appendChild(b);
+  });
+});
+var padN = document.getElementById('padN');
+['7','8','9','4','5','6','1','2','3'].forEach(function(n){
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'kbk num'; b.textContent = n; b.dataset.k = n;
+  padN.appendChild(b);
+});
+[['del','⌫','4','1'],['zero','0','4','2'],['entk','確定','4','3']].forEach(function(x){
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'kbk ' + x[0]; b.textContent = x[1];
+  b.style.gridColumn = x[2]; b.style.gridRow = x[3];
+  b.dataset.k = x[0] === 'zero' ? '0' : (x[0] === 'del' ? '\b' : '');
+  padN.appendChild(b);
+});
+function 套用試打區(){
+  pad.className = '';                                   // 試打區整塊掛 vN，底下所有鍵一起換動畫
+  if (選動畫) pad.classList.add('v' + 選動畫);
+}
+pad.addEventListener('pointerdown', function(e){
+  var b = e.target.closest('.kbk'); if (!b) return;
+  e.preventDefault();
+  壓(b); 震一下(); 播(選音效);
+  var k = b.dataset.k;
+  if (k === '\b') out.textContent = out.textContent.slice(0, -1);
+  else if (k) out.textContent = (out.textContent + k).slice(-40);
+});
+
+/* ══════════ 裝置支援回報（遠端除錯用）══════════ */
+var vibOK = !!navigator.vibrate, audOK = !!(window.AudioContext || window.webkitAudioContext);
+document.getElementById('vibNote').innerHTML = vibOK
+  ? '這台裝置<b style="color:#2B7E43">支援</b>震動。'
+  : '<span class="warn">這台裝置不支援 navigator.vibrate</span> —— iPhone／桌機一律沒有震動（網頁改不了），Android 才有。';
+document.getElementById('cap').innerHTML =
+  '本機支援：震動 ' + (vibOK ? '✅' : '❌') + '　音訊 ' + (audOK ? '✅' : '❌') +
+  '　螢幕 ' + screen.width + '×' + screen.height + '　視窗 ' + innerWidth + '×' + innerHeight;
+
+var vol = document.getElementById('vol');
+vol.addEventListener('input', function(){
+  document.getElementById('volTxt').textContent = vol.value;
+  if (ac()) MASTER.gain.value = vol.value / 100;
+});
+
+更新摘要(); 套用試打區();
+</script>
+</body>
+</html>
