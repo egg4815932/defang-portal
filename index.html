@@ -30,21 +30,11 @@
   iframe{display:block;width:100%;height:100%;border:0}
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
-
-  /* ===== 臨時診斷：找「側邊一條用不到的黑」用的，量完就整段刪掉 =====
-     #edgeMark 畫在「頂層 viewport 的四個邊」。有 viewport-fit=cover 時，
-     fixed 元素的容器就是整個螢幕（含挖孔），所以：
-       ・洋紅線貼著螢幕最邊緣、外面沒有黑  → 視窗有蓋到挖孔區
-       ・洋紅線外面還看得到黑              → Android 把視窗擋在挖孔外（黑不是我們畫的） */
-  #edgeMark{position:fixed;inset:0;border:3px solid #f0f;pointer-events:none;z-index:2147483646}
-  #diagBox{position:fixed;left:50%;top:6px;transform:translateX(-50%);max-width:94%;
-    background:rgba(0,0,0,.88);color:#5df;font:11px/1.55 ui-monospace,Menlo,Consolas,monospace;
-    padding:8px 12px;border-radius:8px;z-index:2147483647;white-space:pre;
-    -webkit-user-select:all;user-select:all}
-  #fsBtn{display:block;width:100%;margin:8px 0 2px;padding:10px;border:0;border-radius:6px;
-    background:#2B7E43;color:#fff;font:bold 14px/1.2 system-ui,sans-serif}
-  #diagHide{display:block;width:100%;margin:4px 0 0;padding:6px;border:0;border-radius:6px;
-    background:#444;color:#bbb;font:12px/1.2 system-ui,sans-serif}
+  /* 自動進全螢幕失敗時才亮出來的備援鈕（順利的話使用者永遠看不到它） */
+  #fsFallback{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2147483647;
+    display:none;padding:10px 20px;border:0;border-radius:999px;
+    background:rgba(43,126,67,.94);color:#fff;font:14px/1.2 "Microsoft JhengHei",sans-serif;
+    box-shadow:0 2px 12px rgba(0,0,0,.28)}
 </style>
 </head>
 <body>
@@ -53,16 +43,66 @@
     src="https://script.google.com/macros/s/AKfycbw2PGNABsP3BGqeoQEqBVdxcz1dkneTw9q-WthtUvXvJ0bjkrOiiRyOPPLuTyr-QBoK/exec"
     allow="autoplay; encrypted-media; fullscreen; geolocation *"
     allowfullscreen></iframe>
+  <button id="fsFallback" type="button">點一下用滿整個螢幕</button>
 
-<!-- ===== 臨時診斷區塊：量完真機數字就整段刪掉（含上方 CSS） ===== -->
-<div id="edgeMark"></div>
-<div id="diagBox"><span id="diagOut">量測中…</span>
-<button id="fsBtn">👆 點我：測試 Fullscreen API 能不能拿到挖孔區</button>
-<button id="diagHide">收起診斷</button></div>
 <script>
-// 帶時間戳載入，繞過 GitHub Pages 的 10 分鐘快取（原因見 diag.js 開頭註解）
-document.body.appendChild(Object.assign(document.createElement('script'),
-  { src: 'diag.js?t=' + Date.now() }));
+/* ===== 吃到螢幕最側邊那條「挖孔區」（2026-08-03 真機實測定案）=====
+   症狀：Android 手機橫放時，前鏡頭那一側永遠有一條用不到的黑（實測 41 CSS px）。
+
+   根因：Chrome 把「內容能不能延伸進挖孔」綁死在 Fullscreen API 上。
+   WebAPK 就算 manifest 寫了 display:fullscreen，只要沒進 Fullscreen API，
+   Chrome 就自己把 viewport 縮到挖孔內側 —— 真機量到 screen 915 / inner 874，
+   而 safe-area-inset 全部回報 0（＝Chrome 根本沒把這頁當 viewport-fit=cover）。
+   那 41px 不是我們沒畫，是壓根沒分配給我們，在 CSS 層怎麼補都沒用
+   （2026-08-02 在 doGet 與 index.html 補 viewport-fit / env() 全部無效，就是這個原因：
+     那兩層都在 iframe 內，iframe 裡的 env(safe-area-inset-*) 恆為 0）。
+   進了 Fullscreen API 之後：inner 914、safe-area-left 40，整條拿回來。
+
+   代價：Chrome 會跳一次「從頂端向下拖曳可退出全螢幕」的系統提示。
+   ⚠ 那個提示關不掉，別再花時間找方法 —— 它是刻意的安全防護（網頁若能無聲佔滿整個
+     螢幕就能偽裝成系統畫面），Chromium 上要求隱藏它的票都掛 Security 標籤。
+     navigationUI:'hide' 管的是導覽列，不是這個提示。使用者已知並接受。
+
+   ⚠ iPhone 不支援非 video 元素的 Fullscreen API，但它也不需要 ——
+     iOS 主畫面 App 靠 viewport-fit=cover + black-translucent 原生就會鋪到瀏海底下。
+     下面那個「寬度落差」判斷會讓 iPhone／iPad／桌機／無挖孔機種全部自動跳過這一段。 */
+(function () {
+  var el = document.documentElement;
+  if (!el.requestFullscreen) return;                  // iPhone 從這裡離開
+
+  // 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示
+  if (Math.round(screen.width - window.innerWidth) <= 1) return;
+
+  var btn = document.getElementById('fsFallback');
+  var timer = null, tries = 0;
+
+  function go() {
+    return el.requestFullscreen({ navigationUI: 'hide' })['catch'](function () {});
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function start() { stop(); tries = 0; timer = setInterval(tick, 500); }
+
+  function tick() {
+    if (document.fullscreenElement) { stop(); btn.style.display = 'none'; return; }
+
+    /* 使用者碰到的是 GAS 那個跨網域 iframe，殼頁收不到任何事件；
+       但 user activation 會沿著 frame 樹往上傳給祖先，所以這裡讀得到「剛剛有人碰過畫面」，
+       可以順勢補上全螢幕請求 —— 不必多做一個「點一下開始」的過場。 */
+    var ua = navigator.userActivation;
+    if (ua && ua.isActive) go();
+
+    // 自動這條路走不通時（人明明碰過卻始終進不去）才亮備援鈕，順利的話不會出現
+    if (tries > 16 && (!ua || ua.hasBeenActive)) btn.style.display = 'block';
+    if (++tries > 600) stop();                        // 5 分鐘後收工，不要無限輪詢耗電
+  }
+
+  btn.addEventListener('click', function () { go(); });
+  document.addEventListener('fullscreenchange', function () {
+    if (document.fullscreenElement) { stop(); btn.style.display = 'none'; }
+    else start();          // 使用者自己滑掉全螢幕的話，下次碰畫面時再補回來
+  });
+  start();
+})();
 </script>
 </body>
 </html>
