@@ -41,6 +41,10 @@
     background:rgba(0,0,0,.88);color:#5df;font:11px/1.55 ui-monospace,Menlo,Consolas,monospace;
     padding:8px 12px;border-radius:8px;z-index:2147483647;white-space:pre;
     -webkit-user-select:all;user-select:all}
+  #fsBtn{display:block;width:100%;margin:8px 0 2px;padding:10px;border:0;border-radius:6px;
+    background:#2B7E43;color:#fff;font:bold 14px/1.2 system-ui,sans-serif}
+  #diagHide{display:block;width:100%;margin:4px 0 0;padding:6px;border:0;border-radius:6px;
+    background:#444;color:#bbb;font:12px/1.2 system-ui,sans-serif}
 </style>
 </head>
 <body>
@@ -52,7 +56,9 @@
 
 <!-- ===== 臨時診斷區塊：量完真機數字就整段刪掉（含上方 CSS） ===== -->
 <div id="edgeMark"></div>
-<div id="diagBox">量測中…</div>
+<div id="diagBox"><span id="diagOut">量測中…</span>
+<button id="fsBtn">👆 點我：測試 Fullscreen API 能不能拿到挖孔區</button>
+<button id="diagHide">收起診斷</button></div>
 <script>
 (function(){
   // 用一個 fixed 探針把 env(safe-area-inset-*) 換算成看得到的 px
@@ -62,44 +68,80 @@
     'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
   document.body.appendChild(probe);
 
-  var box = document.getElementById('diagBox');
+  var out = document.getElementById('diagOut');
   function n(v){ return Math.round(parseFloat(v) || 0); }
 
-  function dump(){
+  function snap(){
     var cs = getComputedStyle(probe);
-    var sl = n(cs.paddingLeft), sr = n(cs.paddingRight),
-        st = n(cs.paddingTop),  sb = n(cs.paddingBottom);
     var f  = document.querySelector('iframe').getBoundingClientRect();
     var vv = window.visualViewport || {};
-    var dm = ['fullscreen','standalone','minimal-ui','browser'].filter(function(m){
-               return matchMedia('(display-mode:' + m + ')').matches; }).join(',') || '?';
-    var gap = Math.round(screen.width - window.innerWidth);
-
-    var verdict = gap > 1
-      ? '[A] 視窗比螢幕窄 ' + gap + 'px -> Android 沒讓視窗進挖孔區'
-      : (sl || sr
-          ? '[B] 視窗蓋滿螢幕，安全區 L' + sl + '/R' + sr + ' -> 黑條是我們自己沒畫'
-          : '[C] 視窗蓋滿螢幕且無安全區 -> 黑條不在這一層');
-
-    box.textContent =
-      verdict + '\n' +
-      'screen   ' + screen.width + ' x ' + screen.height + '    dpr ' + window.devicePixelRatio + '\n' +
-      'inner    ' + innerWidth + ' x ' + innerHeight + '    outer ' + outerWidth + ' x ' + outerHeight + '\n' +
-      'visualVP ' + n(vv.width) + ' x ' + n(vv.height) + '  offL ' + n(vv.offsetLeft) + '  scale ' + (vv.scale || '-') + '\n' +
-      'safe-area  L' + sl + '  R' + sr + '  T' + st + '  B' + sb + '\n' +
-      'iframe   x' + n(f.left) + ' y' + n(f.top) + ' w' + n(f.width) + ' h' + n(f.height) + '\n' +
-      'mode ' + dm + '   orient ' + ((screen.orientation || {}).type || '?') + '\n' +
-      'UA ' + navigator.userAgent.slice(0, 110);
+    return {
+      sw: screen.width, sh: screen.height,
+      iw: innerWidth,   ih: innerHeight,
+      ow: outerWidth,   oh: outerHeight,
+      vw: n(vv.width),  vh: n(vv.height), vo: n(vv.offsetLeft),
+      sl: n(cs.paddingLeft), sr: n(cs.paddingRight),
+      st: n(cs.paddingTop),  sb: n(cs.paddingBottom),
+      fx: n(f.left), fy: n(f.top), fw: n(f.width), fh: n(f.height),
+      dm: ['fullscreen','standalone','minimal-ui','browser'].filter(function(m){
+            return matchMedia('(display-mode:' + m + ')').matches; }).join(',') || '?',
+      fs: !!(document.fullscreenElement || document.webkitFullscreenElement)
+    };
   }
 
-  dump();
-  addEventListener('resize', dump);
-  addEventListener('orientationchange', function(){ setTimeout(dump, 300); });
-  if (window.visualViewport) visualViewport.addEventListener('resize', dump);
+  function verdict(s){
+    var gap = Math.round(s.sw - s.iw);
+    return gap > 1 ? '[A] 視窗比螢幕窄 ' + gap + 'px -> 沒拿到挖孔區'
+         : (s.sl || s.sr ? '[B] 蓋滿螢幕 + 安全區 L' + s.sl + '/R' + s.sr + ' -> 拿到挖孔區了'
+                         : '[C] 蓋滿螢幕且無安全區');
+  }
 
-  // 點一下收起（診斷面板與洋紅框一起收）
-  box.addEventListener('click', function(){
-    box.style.display = 'none';
+  var before = null, fsErr = '';
+
+  function render(){
+    var s = snap();
+    var t = verdict(s) + '\n' +
+      'screen ' + s.sw + 'x' + s.sh + '  dpr ' + devicePixelRatio +
+        '   inner ' + s.iw + 'x' + s.ih + '   outer ' + s.ow + 'x' + s.oh + '\n' +
+      'visualVP ' + s.vw + 'x' + s.vh + ' offL ' + s.vo +
+        '   safe L' + s.sl + ' R' + s.sr + ' T' + s.st + ' B' + s.sb + '\n' +
+      'iframe x' + s.fx + ' y' + s.fy + ' w' + s.fw + ' h' + s.fh +
+        '   mode ' + s.dm + '   FS-API ' + (s.fs ? 'ON' : 'off');
+    if (before) {
+      t += '\n--------- 前後對照 ---------\n' +
+           'FS 前   inner ' + before.iw + '   safeL ' + before.sl + '\n' +
+           'FS 後   inner ' + s.iw + '   safeL ' + s.sl + '   ' +
+           (s.iw > before.iw || s.sl > 0 ? '==> 有效！Fullscreen API 拿得到'
+                                         : '==> 沒變，這條路不通');
+    }
+    if (fsErr) t += '\nFS 錯誤: ' + fsErr;
+    out.textContent = t;
+  }
+
+  render();
+  addEventListener('resize', render);
+  addEventListener('orientationchange', function(){ setTimeout(render, 300); });
+  document.addEventListener('fullscreenchange', function(){ setTimeout(render, 400); });
+  if (window.visualViewport) visualViewport.addEventListener('resize', render);
+
+  // 測試：分頁進入 Fullscreen API，看 Chrome 會不會改用 SHORT_EDGES 挖孔模式
+  document.getElementById('fsBtn').addEventListener('click', function(){
+    before = snap(); fsErr = '';
+    var el = document.documentElement, p = null;
+    try {
+      if (el.requestFullscreen)            p = el.requestFullscreen({ navigationUI: 'hide' });
+      else if (el.webkitRequestFullscreen) p = el.webkitRequestFullscreen();
+      else fsErr = '這個瀏覽器沒有 requestFullscreen';
+    } catch (err) { fsErr = String(err && err.message || err); }
+    if (p && p['catch']) p['catch'](function(err){
+      fsErr = String(err && err.message || err); render();
+    });
+    setTimeout(render, 600);
+    setTimeout(render, 1600);
+  });
+
+  document.getElementById('diagHide').addEventListener('click', function(){
+    document.getElementById('diagBox').style.display = 'none';
     document.getElementById('edgeMark').style.display = 'none';
   });
 })();
