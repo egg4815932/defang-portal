@@ -30,6 +30,17 @@
   iframe{display:block;width:100%;height:100%;border:0}
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
+
+  /* ===== 臨時診斷：找「側邊一條用不到的黑」用的，量完就整段刪掉 =====
+     #edgeMark 畫在「頂層 viewport 的四個邊」。有 viewport-fit=cover 時，
+     fixed 元素的容器就是整個螢幕（含挖孔），所以：
+       ・洋紅線貼著螢幕最邊緣、外面沒有黑  → 視窗有蓋到挖孔區
+       ・洋紅線外面還看得到黑              → Android 把視窗擋在挖孔外（黑不是我們畫的） */
+  #edgeMark{position:fixed;inset:0;border:3px solid #f0f;pointer-events:none;z-index:2147483646}
+  #diagBox{position:fixed;left:50%;top:6px;transform:translateX(-50%);max-width:94%;
+    background:rgba(0,0,0,.88);color:#5df;font:11px/1.55 ui-monospace,Menlo,Consolas,monospace;
+    padding:8px 12px;border-radius:8px;z-index:2147483647;white-space:pre;
+    -webkit-user-select:all;user-select:all}
 </style>
 </head>
 <body>
@@ -38,5 +49,60 @@
     src="https://script.google.com/macros/s/AKfycbw2PGNABsP3BGqeoQEqBVdxcz1dkneTw9q-WthtUvXvJ0bjkrOiiRyOPPLuTyr-QBoK/exec"
     allow="autoplay; encrypted-media; fullscreen; geolocation *"
     allowfullscreen></iframe>
+
+<!-- ===== 臨時診斷區塊：量完真機數字就整段刪掉（含上方 CSS） ===== -->
+<div id="edgeMark"></div>
+<div id="diagBox">量測中…</div>
+<script>
+(function(){
+  // 用一個 fixed 探針把 env(safe-area-inset-*) 換算成看得到的 px
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+    'padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);' +
+    'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+  document.body.appendChild(probe);
+
+  var box = document.getElementById('diagBox');
+  function n(v){ return Math.round(parseFloat(v) || 0); }
+
+  function dump(){
+    var cs = getComputedStyle(probe);
+    var sl = n(cs.paddingLeft), sr = n(cs.paddingRight),
+        st = n(cs.paddingTop),  sb = n(cs.paddingBottom);
+    var f  = document.querySelector('iframe').getBoundingClientRect();
+    var vv = window.visualViewport || {};
+    var dm = ['fullscreen','standalone','minimal-ui','browser'].filter(function(m){
+               return matchMedia('(display-mode:' + m + ')').matches; }).join(',') || '?';
+    var gap = Math.round(screen.width - window.innerWidth);
+
+    var verdict = gap > 1
+      ? '[A] 視窗比螢幕窄 ' + gap + 'px -> Android 沒讓視窗進挖孔區'
+      : (sl || sr
+          ? '[B] 視窗蓋滿螢幕，安全區 L' + sl + '/R' + sr + ' -> 黑條是我們自己沒畫'
+          : '[C] 視窗蓋滿螢幕且無安全區 -> 黑條不在這一層');
+
+    box.textContent =
+      verdict + '\n' +
+      'screen   ' + screen.width + ' x ' + screen.height + '    dpr ' + window.devicePixelRatio + '\n' +
+      'inner    ' + innerWidth + ' x ' + innerHeight + '    outer ' + outerWidth + ' x ' + outerHeight + '\n' +
+      'visualVP ' + n(vv.width) + ' x ' + n(vv.height) + '  offL ' + n(vv.offsetLeft) + '  scale ' + (vv.scale || '-') + '\n' +
+      'safe-area  L' + sl + '  R' + sr + '  T' + st + '  B' + sb + '\n' +
+      'iframe   x' + n(f.left) + ' y' + n(f.top) + ' w' + n(f.width) + ' h' + n(f.height) + '\n' +
+      'mode ' + dm + '   orient ' + ((screen.orientation || {}).type || '?') + '\n' +
+      'UA ' + navigator.userAgent.slice(0, 110);
+  }
+
+  dump();
+  addEventListener('resize', dump);
+  addEventListener('orientationchange', function(){ setTimeout(dump, 300); });
+  if (window.visualViewport) visualViewport.addEventListener('resize', dump);
+
+  // 點一下收起（診斷面板與洋紅框一起收）
+  box.addEventListener('click', function(){
+    box.style.display = 'none';
+    document.getElementById('edgeMark').style.display = 'none';
+  });
+})();
+</script>
 </body>
 </html>
