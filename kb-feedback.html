@@ -127,6 +127,29 @@ h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(30,
   100%{transform:translateY(0) scale(1)}
 }
 
+/* ══════════ 深壓微調 d1~d5：實體鍵(3) × 深壓凹陷(1) 的融合，只有「沉多深」不同 ══════════
+   骨架沿用實體鍵：底座 0 4px 0 的硬投影，按下時投影被壓扁＝鍵帽真的沉下去。
+   疊上的是 1 號的內陰影＋縮放＋壓深後變暗的鍵面 —— 這三樣才是「凹進去」的來源。
+   ⚠ 底座固定 4px 不加高：鍵列的垂直間距只有 5px，底座再高會壓到下一排的鍵。
+      要更深一律往「內陰影 / 縮放 / 顏色」加，那三樣不佔版面空間。 */
+.d1 .kbk,.d2 .kbk,.d3 .kbk,.d4 .kbk,.d5 .kbk{
+  box-shadow:0 4px 0 #A7DFAF,0 5px 8px rgba(35,105,60,.20)}
+.d1 .kbk.press{transform:translateY(3px);
+  background:linear-gradient(180deg,#E2F5E7,#CDEBD5);
+  box-shadow:0 1px 0 #A7DFAF,inset 0 2px 5px rgba(35,105,60,.22)}
+.d2 .kbk.press{transform:translateY(4px) scale(.985);
+  background:linear-gradient(180deg,#D5F0DA,#A7DFAF);
+  box-shadow:0 0 0 #A7DFAF,inset 0 3px 7px rgba(35,105,60,.30)}
+.d3 .kbk.press{transform:translateY(5px) scale(.968);
+  background:linear-gradient(180deg,#C6EACD,#9BD9A6);
+  box-shadow:0 0 0 #A7DFAF,inset 0 4px 9px rgba(35,105,60,.38)}
+.d4 .kbk.press{transform:translateY(5px) scale(.95);
+  background:linear-gradient(180deg,#B8E3C1,#8FD29C);border-color:rgba(43,126,67,.5);
+  box-shadow:0 0 0 #A7DFAF,inset 0 5px 12px rgba(30,66,41,.46)}
+.d5 .kbk.press{transform:translateY(6px) scale(.93);
+  background:linear-gradient(180deg,#A7DFAF,#7FC98D);border-color:rgba(43,126,67,.62);
+  box-shadow:0 0 0 #A7DFAF,inset 0 6px 14px rgba(30,66,41,.55)}
+
 .cardKey{margin:2px 0 2px;display:flex;justify-content:center}
 
 /* ── 震動 / 音量 控制列 ── */
@@ -177,6 +200,7 @@ input[type=range]{width:150px;accent-color:var(--btn)}
   <h1>自製鍵盤 · 按壓回饋選型</h1>
   <div class="picks">
     <span class="pick none" id="pkA">動畫 <b>未選</b></span>
+    <span class="pick none" id="pkD">深度 <b>未選</b></span>
     <span class="pick none" id="pkS">音效 <b>未選</b></span>
     <span class="pick" id="pkV">震動 <b>15ms</b></span>
   </div>
@@ -189,7 +213,16 @@ input[type=range]{width:150px;accent-color:var(--btn)}
 </p>
 <div class="grid" id="gridA"></div>
 
-<h2>② 按鍵音效（10 選 1）</h2>
+<h2>② 深壓程度（5 選 1）</h2>
+<p class="hint">
+  <b>★ 這一段就是你要調的。</b>已選的 <b>3 實體鍵</b>（鍵帽下沉、底座投影被壓扁）再疊上 <b>1 深壓凹陷</b> 的內陰影 ——
+  骨架不變，只有<b>沉多深</b>不一樣。<br>
+  <b>1</b> 最接近你現在選的原味，<b>5</b> 最誇張。<span class="warn">建議連按同一顆好幾下</span>，
+  單按一次感覺不出差別。
+</p>
+<div class="grid" id="gridD"></div>
+
+<h2>③ 按鍵音效（10 選 1）</h2>
 <p class="hint">
   一樣按鍵帽試聽。全部是<b>程式即時合成</b>的（不抓外部音檔，離線與 GAS 沙盒內都能用）。<br>
   <span class="warn">⚠ iPhone 開靜音開關時聽不到</span>（Web Audio 走鈴聲通道）；Android 不受影響。
@@ -199,7 +232,7 @@ input[type=range]{width:150px;accent-color:var(--btn)}
 </div>
 <div class="grid" id="gridS"></div>
 
-<h2>③ 震動強度</h2>
+<h2>④ 震動強度</h2>
 <p class="hint">網頁只能控制<b>時間長短</b>，控制不了強弱；越短越像「輕輕一頓」。</p>
 <div class="rowset">
   <div class="seg" id="segV">
@@ -212,7 +245,7 @@ input[type=range]{width:150px;accent-color:var(--btn)}
 </div>
 <p class="note" id="vibNote"></p>
 
-<h2>④ 試打區（三樣一起感受）</h2>
+<h2>⑤ 試打區（全部一起感受）</h2>
 <p class="hint">用你目前選的組合連續打字看看 —— 單看一顆和實際連打的感覺差很多。</p>
 <div id="tryWrap">
   <div id="tryOut"></div>
@@ -319,8 +352,17 @@ var ANIMS = [
   { n:'雙段回彈',   d:'沉下去→彈過頭→定位，最有彈性' }
 ];
 
+var DEPTHS = [
+  { n:'1 原味',   d:'就是你選的 3 實體鍵，幾乎不加凹陷' },
+  { n:'2 微凹',   d:'多一層淡淡的內陰影，開始有凹感' },
+  { n:'3 明顯凹', d:'鍵面壓深變色，凹陷看得很清楚' },
+  { n:'4 深凹',   d:'內陰影再加重＋描邊變深' },
+  { n:'5 極深',   d:'沉最多、最暗，按重一點的手感' }
+];
+
 /* ══════════ 狀態 ══════════ */
-var 選動畫 = 0, 選音效 = 0, 震動 = 15;     // 0 = 尚未選
+/* 使用者 2026-08-03 已定案：動畫 3 實體鍵、音效 2 iPhone 清脆、震動 15ms，開頁就先套上 */
+var 選動畫 = 3, 選深度 = 0, 選音效 = 2, 震動 = 15;
 var HOLD = 200;                            // ⚠ 使用者指定：凹下去撐住 0.2 秒再彈回
 
 function 震一下(){
@@ -339,9 +381,12 @@ function 壓(el){
 }
 
 function 更新摘要(){
-  var a = document.getElementById('pkA'), s = document.getElementById('pkS');
+  var a = document.getElementById('pkA'), s = document.getElementById('pkS'),
+      dp = document.getElementById('pkD');
   a.className = 'pick' + (選動畫 ? '' : ' none');
-  a.innerHTML = '動畫 <b>' + (選動畫 ?選動畫 + '　' + ANIMS[選動畫-1].n : '未選') + '</b>';
+  a.innerHTML = '動畫 <b>' + (選動畫 ? 選動畫 + '　' + ANIMS[選動畫-1].n : '未選') + '</b>';
+  dp.className = 'pick' + (選深度 ? '' : ' none');
+  dp.innerHTML = '深度 <b>' + (選深度 ? DEPTHS[選深度-1].n : '未選') + '</b>';
   s.className = 'pick' + (選音效 ? '' : ' none');
   s.innerHTML = '音效 <b>' + (選音效 ? 選音效 + '　' + SOUNDS[選音效-1].n : '未選') + '</b>';
   document.getElementById('pkV').innerHTML = '震動 <b>' + (震動 ? 震動 + 'ms' : '關閉') + '</b>';
@@ -371,6 +416,21 @@ ANIMS.forEach(function(a, i){
   });
   gA.appendChild(c);
 });
+/* 深壓程度：卡片掛 dN，鍵帽就是該深度的樣子；選了深度就蓋過純動畫（兩者是同一個位置的設定） */
+var gD = document.getElementById('gridD');
+DEPTHS.forEach(function(x, i){
+  var no = i + 1;
+  var c = 卡(no, x.n, x.d, 'd' + no);
+  c.addEventListener('pointerdown', function(){
+    選深度 = no;
+    [].forEach.call(gD.children, function(y){ y.classList.remove('on'); });
+    c.classList.add('on');
+    壓(c.querySelector('.kbk')); 震一下(); 播(選音效);
+    更新摘要(); 套用試打區();
+  });
+  gD.appendChild(c);
+});
+
 var gS = document.getElementById('gridS');
 SOUNDS.forEach(function(s, i){
   var no = i + 1;
@@ -418,8 +478,10 @@ var padN = document.getElementById('padN');
   padN.appendChild(b);
 });
 function 套用試打區(){
-  pad.className = '';                                   // 試打區整塊掛 vN，底下所有鍵一起換動畫
-  if (選動畫) pad.classList.add('v' + 選動畫);
+  pad.className = '';                    // 試打區整塊掛 vN / dN，底下所有鍵一起換
+  // 深度是「實體鍵的加強版」，選了就以它為準，不要兩層一起套（transform 會互相蓋掉）
+  if (選深度) pad.classList.add('d' + 選深度);
+  else if (選動畫) pad.classList.add('v' + 選動畫);
 }
 pad.addEventListener('pointerdown', function(e){
   var b = e.target.closest('.kbk'); if (!b) return;
@@ -445,6 +507,9 @@ vol.addEventListener('input', function(){
   if (ac()) MASTER.gain.value = vol.value / 100;
 });
 
+/* 開頁就把已定案的兩項標成已選（使用者挑過了，不必再挑一次） */
+if (選動畫) gA.children[選動畫-1].classList.add('on');
+if (選音效) gS.children[選音效-1].classList.add('on');
 更新摘要(); 套用試打區();
 </script>
 </body>
