@@ -67,6 +67,11 @@
     display:none;padding:10px 20px;border:0;border-radius:999px;
     background:rgba(43,126,67,.94);color:#fff;font:14px/1.2 "Microsoft JhengHei",sans-serif;
     box-shadow:0 2px 12px rgba(0,0,0,.28)}
+  #versionBadge{position:fixed;top:max(10px,env(safe-area-inset-top));
+    right:max(10px,env(safe-area-inset-right));z-index:2147483646;pointer-events:none;
+    padding:5px 9px;border:1px solid rgba(255,255,255,.55);border-radius:999px;
+    background:rgba(30,76,43,.72);color:#fff;font:600 11px/1 "Microsoft JhengHei",sans-serif;
+    letter-spacing:.04em;box-shadow:0 2px 8px rgba(0,0,0,.2);backdrop-filter:blur(4px)}
 </style>
 </head>
 <body>
@@ -80,9 +85,13 @@
     src="https://script.google.com/macros/s/AKfycbw2PGNABsP3BGqeoQEqBVdxcz1dkneTw9q-WthtUvXvJ0bjkrOiiRyOPPLuTyr-QBoK/exec"
     allow="autoplay *; encrypted-media *; fullscreen *; geolocation *; vibrate *"
     allowfullscreen></iframe>
+  <div id="versionBadge" aria-label="系統版本"></div>
   <button id="fsFallback" type="button">點一下用滿整個螢幕</button>
 
 <script>
+var PORTAL_VERSION = '1.0.0';
+document.getElementById('versionBadge').textContent = 'v' + PORTAL_VERSION;
+
 /* ===== 吃到螢幕最側邊那條「挖孔區」（2026-08-03 真機實測定案）=====
    症狀：Android 手機橫放時，前鏡頭那一側永遠有一條用不到的黑（實測 41 CSS px）。
 
