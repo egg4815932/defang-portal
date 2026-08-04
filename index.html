@@ -73,7 +73,12 @@
   <div class="fallback">德芳連鎖藥局 內部查詢系統載入中…</div>
   <iframe
     src="https://script.google.com/macros/s/AKfycbw2PGNABsP3BGqeoQEqBVdxcz1dkneTw9q-WthtUvXvJ0bjkrOiiRyOPPLuTyr-QBoK/exec"
-    allow="autoplay; encrypted-media; fullscreen; geolocation *"
+    <!-- ⚠ 權限是「逐層委派」的：外層沒給，內層那個 googleusercontent 沙盒 iframe 就拿不到。
+         geolocation 當初就是漏了它而讓 GPS 簽到必定失敗。vibrate 是為了自製鍵盤的按鍵震動先補上
+         （目前 Chrome 未必把它列為 permission policy，是不認就忽略的保險，加了無害）。
+         一律用 * 不用預設的 'src'：GAS 會再轉一層到 googleusercontent（不同 origin），
+         'src' 只放行 script.google.com 會在第二道門被卡掉。 -->
+    allow="autoplay; encrypted-media; fullscreen; geolocation *; vibrate *"
     allowfullscreen></iframe>
   <button id="fsFallback" type="button">點一下用滿整個螢幕</button>
 
