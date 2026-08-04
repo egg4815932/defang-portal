@@ -122,39 +122,25 @@
   if (Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
   var btn = document.getElementById('fsFallback');
-  var timer = null, 起點 = 0;
+  var timer = null;
 
   function go() {
     return el.requestFullscreen({ navigationUI: 'hide' })['catch'](function () {});
   }
-  function stop() { if (timer) { clearInterval(timer); timer = null; } }
-  /* ⚠ 間隔要短（200ms 不是 500ms）：GAS 那層的 index.html 在「按下登入的當下」也會呼叫
-     一次 openFullscreen()，它若搶在我們前面，全螢幕元素會變成整個 GAS iframe（top layer），
-     上面 --app-scale 的 transform 當場失效＝畫面跳回 100%。
-     我們先進全螢幕的話，index.html 的 已是App全螢幕() 守門會讀到 (display-mode: fullscreen)
-     ＝true 而自己 return（跨兩層 iframe 也讀得到，2026-08-03 用三層跨域探針實測過）。
-     門檻改用「經過的毫秒」而不是次數，日後再調間隔也不必重算。 */
-  function start() { stop(); 起點 = Date.now(); timer = setInterval(tick, 200); }
-
-  function tick() {
-    var 已過 = Date.now() - 起點;
-    if (document.fullscreenElement) { stop(); btn.style.display = 'none'; return; }
-
-    /* 使用者碰到的是 GAS 那個跨網域 iframe，殼頁收不到任何事件；
-       但 user activation 會沿著 frame 樹往上傳給祖先，所以這裡讀得到「剛剛有人碰過畫面」，
-       可以順勢補上全螢幕請求 —— 不必多做一個「點一下開始」的過場。 */
-    var ua = navigator.userActivation;
-    if (ua && ua.isActive) go();
-
-    // 自動這條路走不通時（人明明碰過卻始終進不去）才亮備援鈕，順利的話不會出現
-    if (已過 > 8000 && (!ua || ua.hasBeenActive)) btn.style.display = 'block';
-    if (已過 > 300000) stop();                        // 5 分鐘後收工，不要無限輪詢耗電
+  function stop() { if (timer) { clearTimeout(timer); timer = null; } }
+  /* ⚠ 不可再監看使用者啟用狀態並自動請求全螢幕：
+     殼頁會搶走內層 YouTube 播放需要的那次使用者手勢，造成手機與電腦都回報
+     onAutoplayBlocked。全螢幕只能由使用者明確點上方備援鈕，不再偷用影片點擊。 */
+  function start() {
+    stop();
+    if (document.fullscreenElement) return;
+    timer = setTimeout(function () { btn.style.display = 'block'; }, 8000);
   }
 
   btn.addEventListener('click', function () { go(); });
   document.addEventListener('fullscreenchange', function () {
     if (document.fullscreenElement) { stop(); btn.style.display = 'none'; }
-    else start();          // 使用者自己滑掉全螢幕的話，下次碰畫面時再補回來
+    else start();          // 退出全螢幕後再顯示專用按鈕，不搶其他手勢
   });
   start();
 })();
