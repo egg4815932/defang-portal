@@ -62,16 +62,14 @@
   }
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
-  /* 自動進全螢幕失敗時才亮出來的備援鈕（順利的話使用者永遠看不到它） */
-  #fsFallback{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2147483647;
-    display:none;padding:10px 20px;border:0;border-radius:999px;
-    background:rgba(43,126,67,.94);color:#fff;font:14px/1.2 "Microsoft JhengHei",sans-serif;
-    box-shadow:0 2px 12px rgba(0,0,0,.28)}
-  #versionBadge{position:fixed;top:max(10px,env(safe-area-inset-top));
-    right:max(10px,env(safe-area-inset-right));z-index:2147483646;pointer-events:none;
-    padding:5px 9px;border:1px solid rgba(255,255,255,.55);border-radius:999px;
-    background:rgba(30,76,43,.72);color:#fff;font:600 11px/1 "Microsoft JhengHei",sans-serif;
-    letter-spacing:.04em;box-shadow:0 2px 8px rgba(0,0,0,.2);backdrop-filter:blur(4px)}
+  /* ⛔ 這裡原本有 #fsFallback ——「點一下用滿整個螢幕」的備援鈕，已於 2026-08-05 移除。
+     使用者：「點一下進入全螢幕這個按鈕很煩」。改成系統內的各式按鈕（同意／登入／側欄…）
+     按下去時由內層 postMessage 通知我們，順勢進全螢幕＝融入操作，不再多一個過場。 */
+  /* ⛔ 這裡原本有 #versionBadge —— 常駐在右上角的 v1.0.0 圓標，已於 2026-08-05 移除。
+     使用者要求「不要佔用到整個程式」：那顆標籤是 fixed 且 z-index 2147483646，
+     永遠壓在系統畫面最上層。版本資訊改成點進去才看 ——
+     位置在系統側邊欄「登出」上方的「ℹ️ 軟體資訊」（實作在 GAS 的 index.html，APP_INFO）。
+     ⚠ 要改版本號請改那裡，不要在這一層加回常駐標籤。 */
 </style>
 </head>
 <body>
@@ -85,13 +83,8 @@
     src="https://script.google.com/macros/s/AKfycbw2PGNABsP3BGqeoQEqBVdxcz1dkneTw9q-WthtUvXvJ0bjkrOiiRyOPPLuTyr-QBoK/exec"
     allow="autoplay *; encrypted-media *; fullscreen *; geolocation *; vibrate *"
     allowfullscreen></iframe>
-  <div id="versionBadge" aria-label="系統版本"></div>
-  <button id="fsFallback" type="button">點一下用滿整個螢幕</button>
 
 <script>
-var PORTAL_VERSION = '1.0.0';
-document.getElementById('versionBadge').textContent = 'v' + PORTAL_VERSION;
-
 /* ===== 吃到螢幕最側邊那條「挖孔區」（2026-08-03 真機實測定案）=====
    症狀：Android 手機橫放時，前鏡頭那一側永遠有一條用不到的黑（實測 41 CSS px）。
 
@@ -130,28 +123,27 @@ document.getElementById('versionBadge').textContent = 'v' + PORTAL_VERSION;
   var SCALE = (行動裝置 && m) ? parseFloat(m[1]) : 1;
   if (Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
-  var btn = document.getElementById('fsFallback');
-  var timer = null;
-
   function go() {
+    if (document.fullscreenElement) return;   // 已經在全螢幕，重複請求只會在 console 報錯
     return el.requestFullscreen({ navigationUI: 'hide' })['catch'](function () {});
   }
-  function stop() { if (timer) { clearTimeout(timer); timer = null; } }
-  /* ⚠ 不可再監看使用者啟用狀態並自動請求全螢幕：
-     殼頁會搶走內層 YouTube 播放需要的那次使用者手勢，造成手機與電腦都回報
-     onAutoplayBlocked。全螢幕只能由使用者明確點上方備援鈕，不再偷用影片點擊。 */
-  function start() {
-    stop();
-    if (document.fullscreenElement) return;
-    timer = setTimeout(function () { btn.style.display = 'block'; }, 8000);
-  }
 
-  btn.addEventListener('click', function () { go(); });
-  document.addEventListener('fullscreenchange', function () {
-    if (document.fullscreenElement) { stop(); btn.style.display = 'none'; }
-    else start();          // 退出全螢幕後再顯示專用按鈕，不搶其他手勢
+  /* ===== 全螢幕由「系統內的按鈕」觸發（2026-08-05）=====
+     使用者：「點一下進入全螢幕這個按鈕很煩，讓同意、登入等各式按鈕點了都會進入全螢幕」。
+     殼頁收不到跨網域 iframe 的任何事件，所以由內層（GAS 的 index.html）在按鈕的 pointerdown
+     時 window.top.postMessage 過來，我們順勢請求全螢幕。使用者的手勢會沿 frame 樹傳給祖先，
+     所以這裡雖然隔了兩層 iframe，requestFullscreen 仍然算「在使用者手勢當中」。
+
+     ⚠⚠ 絕對不可以改回「輪詢 navigator.userActivation 見到互動就進全螢幕」⚠⚠
+     那會把 YouTube 播放要用的那一次手勢搶走 —— 2026-08-04 影片永遠停在 0:00、
+     查了整整一天的事故根因就是它。一次點擊的 transient user activation 只有一份。
+     現在安全的原因是**內層刻意不送影片區的點擊**（.video-container 與表格裡的 ▶ 播放鈕），
+     播放與全螢幕不再競爭同一次點擊。要放寬那份排除清單之前，先回去讀那則事故紀錄。 */
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.defang !== 'fullscreen') return;
+    if (String(e.origin).indexOf('.google') < 0) return;   // 只信任 GAS 那兩層（script.google.com / googleusercontent.com）
+    go();
   });
-  start();
 })();
 </script>
 </body>
