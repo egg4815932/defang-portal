@@ -88,12 +88,18 @@
 /* ===== 安裝到主畫面（2026-08-05）=====
    系統同意頁右邊那顆「安裝」鈕按下去時，內層會 postMessage 過來，我們試著跳出原生安裝視窗。
 
-   ⚠ 目前這條路是備而不用的：Chrome 要發 beforeinstallprompt，網站必須符合安裝條件，
-     其中一項是**要有 service worker**，而這個殼頁刻意沒有（怕快取住 GAS 內容、改了看不到）。
-     所以現在 Android 也是看系統內的圖解教學。要換成「按一下跳原生視窗」，
-     補一個只轉發網路請求、不快取任何東西的 sw.js 並註冊即可，這段程式碼不用改。
+   ⚠ Chrome 要發 beforeinstallprompt，網站必須符合安裝條件，其中一項是**要有 service worker**
+     → 2026-08-05 為此補了 sw.js（使用者要求 Android 做成一鍵）。
+     那支 SW **一個位元組都不快取**，只做 pass-through，所以不會有「改了程式卻看不到」的問題。
+     ⛔ 要在 sw.js 裡加快取之前，先讀它開頭那段警告。
    ⚠ iPhone 永遠走教學那條路：iOS 沒有任何程式化安裝的 API，只能由使用者自己
      「分享 → 加入主畫面」。這是 Apple 的限制，任何網站都一樣。 */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});   // 註冊失敗就算了，只是少掉一鍵安裝
+  });
+}
+
 var deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function (e) {
   e.preventDefault();          // 擋掉 Chrome 自己那條迷你提示列，改由我們的按鈕決定時機
