@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>德芳系統 — 環境診斷</title>
+<style>
+  :root{ --mint:#83CF8F; --btn:#2B7E43; --btn-d:#256E3A; --ink:#1E4229; --sub:#5C8A6B; }
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px 14px 40px;
+    font:16px/1.7 "Microsoft JhengHei","Noto Sans TC",-apple-system,system-ui,sans-serif;color:var(--ink);
+    background:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%);min-height:100vh}
+  h1{font-size:19px;margin:0 0 2px}
+  .sub{font-size:13px;color:var(--sub);margin-bottom:16px}
+  .verdict{padding:14px 16px;border-radius:14px;margin-bottom:16px;font-size:17px;font-weight:bold;
+    background:rgba(255,255,255,.75);border-left:5px solid var(--mint);box-shadow:0 4px 14px rgba(35,105,60,.12)}
+  .verdict.bad{border-left-color:#c9503a}
+  .verdict small{display:block;font-size:13px;font-weight:normal;color:var(--sub);margin-top:4px}
+  h2{font-size:14px;letter-spacing:2px;color:var(--btn-d);margin:20px 0 8px}
+  table{border-collapse:collapse;width:100%;background:rgba(255,255,255,.8);border-radius:12px;overflow:hidden;
+    box-shadow:0 4px 14px rgba(35,105,60,.10)}
+  td{padding:9px 12px;border-bottom:1px solid rgba(43,126,67,.12);font-size:14px;vertical-align:top}
+  td:first-child{white-space:nowrap;color:var(--sub);width:42%}
+  td:last-child{font-weight:bold;word-break:break-all}
+  .y{color:var(--btn)} .n{color:#b3402e}
+  .hint{margin-top:16px;font-size:13px;color:var(--sub);background:rgba(255,255,255,.6);
+    border-radius:12px;padding:12px 14px}
+</style>
+</head>
+<body>
+<h1>環境診斷</h1>
+<div class="sub">把這一頁的內容截圖給 Claude，就知道安裝鈕為什麼沒出現。</div>
+
+<div class="verdict" id="verdict">檢查中…</div>
+
+<h2>安裝鈕會不會顯示</h2>
+<table id="t1"></table>
+
+<h2>一鍵安裝的條件（Android）</h2>
+<table id="t2"></table>
+
+<h2>環境</h2>
+<table id="t3"></table>
+
+<div class="hint">
+  ⓘ <b>display-mode: fullscreen 為什麼不能拿來判斷有沒有安裝</b>：本系統的 manifest 就是
+  <code>display: fullscreen</code>，而瀏覽器進入全螢幕後讀到的值一模一樣，兩者分不出來。
+  所以現在只認 <code>navigator.standalone</code>（iOS／iPadOS 官方 API）與 <code>display-mode: standalone</code>。
+</div>
+
+<script>
+function mq(s) { try { return matchMedia('(' + s + ')').matches; } catch (e) { return false; } }
+function 列(tid, rows) {
+  document.getElementById(tid).innerHTML = rows.map(function (r) {
+    var v = r[1];
+    var cls = v === true ? 'y' : (v === false ? 'n' : '');
+    var txt = v === true ? '✅ 是' : (v === false ? '— 否' : v);
+    return '<tr><td>' + r[0] + '</td><td class="' + cls + '">' + txt + '</td></tr>';
+  }).join('');
+}
+
+var standalone = navigator.standalone === true;
+var dmStandalone = mq('display-mode: standalone');
+var dmFullscreen = mq('display-mode: fullscreen');
+var dmMinimal = mq('display-mode: minimal-ui');
+var dmBrowser = mq('display-mode: browser');
+
+// 與系統內 偵測已安裝() 完全相同的判斷
+var 判定已安裝 = standalone || dmStandalone;
+
+document.getElementById('verdict').className = 'verdict' + (判定已安裝 ? ' bad' : '');
+document.getElementById('verdict').innerHTML = 判定已安裝
+  ? '安裝鈕<b>不會</b>顯示<small>系統判定你已經是從主畫面 App 開啟的。如果你其實還沒安裝，把這頁截圖給 Claude。</small>'
+  : '安裝鈕<b>會</b>顯示 ✅<small>如果實際上仍看不到按鈕，代表問題不在這個判斷，把這頁截圖給 Claude。</small>';
+
+列('t1', [
+  ['navigator.standalone（iOS 官方）', standalone],
+  ['display-mode: standalone', dmStandalone],
+  ['→ 系統判定「已安裝」', 判定已安裝],
+  ['display-mode: fullscreen　（已停用）', dmFullscreen],
+  ['display-mode: minimal-ui　（已停用）', dmMinimal],
+  ['display-mode: browser', dmBrowser]
+]);
+
+var rows2 = [
+  ['支援 service worker', 'serviceWorker' in navigator],
+  ['支援 beforeinstallprompt', 'onbeforeinstallprompt' in window],
+  ['service worker 已註冊', '檢查中…'],
+  ['已收到安裝提示事件', '等待中（最多 5 秒）…']
+];
+列('t2', rows2);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(function () {
+    return navigator.serviceWorker.ready;
+  }).then(function (reg) {
+    rows2[2][1] = '✅ 是（scope ' + reg.scope.replace(location.origin, '') + '）';
+    列('t2', rows2);
+  })['catch'](function (err) {
+    rows2[2][1] = '❌ 失敗：' + err.message;
+    列('t2', rows2);
+  });
+} else {
+  rows2[2][1] = false;
+  列('t2', rows2);
+}
+
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  rows2[3][1] = '✅ 是 → Android 可以一鍵安裝';
+  列('t2', rows2);
+});
+setTimeout(function () {
+  if (String(rows2[3][1]).indexOf('等待') === 0) {
+    rows2[3][1] = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      ? '— iOS／iPadOS 沒有這個事件（正常，只能手動加入主畫面）'
+      : '— 沒收到（可能已安裝過、或 Chrome 還在等你多用一下這個網站）';
+    列('t2', rows2);
+  }
+}, 5000);
+
+列('t3', [
+  ['螢幕 screen', screen.width + ' × ' + screen.height],
+  ['視窗 inner', innerWidth + ' × ' + innerHeight],
+  ['寬度落差（挖孔區）', (screen.width - innerWidth) + ' px'],
+  ['devicePixelRatio', devicePixelRatio],
+  ['觸控裝置 pointer:coarse', mq('pointer: coarse')],
+  ['方向', mq('orientation: portrait') ? '直向' : '橫向'],
+  ['maxTouchPoints', navigator.maxTouchPoints],
+  ['platform', navigator.platform || '—'],
+  ['UA', navigator.userAgent]
+]);
+</script>
+</body>
+</html>
