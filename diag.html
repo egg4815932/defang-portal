@@ -23,6 +23,10 @@
   td:first-child{white-space:nowrap;color:var(--sub);width:42%}
   td:last-child{font-weight:bold;word-break:break-all}
   .y{color:var(--btn)} .n{color:#b3402e}
+  .fsbtn{display:block;width:100%;margin:10px 0 0;padding:14px;border:0;border-radius:12px;
+    background:linear-gradient(180deg,var(--btn) 0%,var(--btn-d) 100%);color:#fff;font-size:16px;
+    font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #1B5E30;cursor:pointer}
+  .fsbtn:active{transform:translateY(3px);box-shadow:0 1px 0 #1B5E30}
   .hint{margin-top:16px;font-size:13px;color:var(--sub);background:rgba(255,255,255,.6);
     border-radius:12px;padding:12px 14px}
 </style>
@@ -38,6 +42,18 @@
 
 <h2>一鍵安裝的條件（Android）</h2>
 <table id="t2"></table>
+
+<h2>iPad：能不能收掉頂端狀態列</h2>
+<table id="t4"></table>
+<button class="fsbtn" id="fsBtn">▶ 實際試一次全螢幕</button>
+<div class="hint">
+  ⓘ <b>iOS／iPadOS 沒有任何網頁 API 可以關掉頂端那條狀態列</b>（時間／日期／電量／Wi-Fi）——
+  原生 App 有 <code>prefersStatusBarHidden</code>，網頁沒有對應物。<br>
+  唯一還有機會的是 <b>Fullscreen API</b>，而它<b>只有 iPad 支援</b>（iPhone 完全不支援非 video 元素的全螢幕）。<br>
+  按上面那顆鈕：<b>如果「視窗高度」變大了</b>，就代表那條列真的被收掉了；
+  高度沒變就是收不掉，那條路到此為止。<br>
+  測完從螢幕頂端往下滑（或按 Esc）可以退出全螢幕。
+</div>
 
 <h2>環境</h2>
 <table id="t3"></table>
@@ -118,6 +134,67 @@ setTimeout(function () {
     列('t2', rows2);
   }
 }, 5000);
+
+/* ===== iPad 狀態列實測 =====
+   殼頁 index.html 那段全螢幕守門有兩道，這裡原樣重現一次，才看得出是被哪一道擋下來的：
+     ① 有沒有 requestFullscreen（iPhone 在這裡出局）
+     ② 寬度落差 > 1（為 Android 挖孔寫的；iPad 沒挖孔＝算出 0，2026-08-06 前一律被擋在這）
+   現在 ② 對 navigator.standalone 開了例外，所以 iPad 主畫面 App 會放行。 */
+var el4 = document.documentElement;
+var 全螢幕函式 = el4.requestFullscreen || el4.webkitRequestFullscreen;
+var vp4 = document.querySelector('meta[name=viewport]');
+var m4 = vp4 && /initial-scale\s*=\s*([\d.]+)/.exec(vp4.content);
+var SCALE4 = (mq('pointer: coarse') && m4) ? parseFloat(m4[1]) : 1;
+var 寬度落差過關 = Math.round(screen.width - innerWidth * SCALE4) > 1;
+var 殼頁會放行 = !!全螢幕函式 && (standalone || 寬度落差過關);
+
+var rows4 = [
+  ['支援 Fullscreen API（非 video）', !!全螢幕函式],
+  ['　└ 標準 requestFullscreen', !!el4.requestFullscreen],
+  ['　└ webkit 前綴版', !!el4.webkitRequestFullscreen],
+  ['navigator.standalone（主畫面 App）', standalone],
+  ['寬度落差守門（Android 挖孔用）', 寬度落差過關],
+  ['→ 殼頁現在會不會請求全螢幕', 殼頁會放行],
+  ['實測結果', '尚未測試 —— 按下面那顆鈕']
+];
+列('t4', rows4);
+
+document.getElementById('fsBtn').addEventListener('click', function () {
+  if (!全螢幕函式) {
+    rows4[6][1] = '❌ 這台裝置沒有 Fullscreen API（iPhone 就是這樣）＝無解';
+    列('t4', rows4); return;
+  }
+  var 前H = innerHeight;
+  rows4[6][1] = '請求中…';
+  列('t4', rows4);
+
+  /* ⚠ 進全螢幕後版面重排要一點時間，立刻量 innerHeight 會量到舊值 → 等 600ms 再量 */
+  function 收尾() {
+    setTimeout(function () {
+      var 後H = innerHeight, 差 = 後H - 前H;
+      rows4[6][1] = (差 > 4)
+        ? '✅ 成功！視窗高 ' + 前H + ' → ' + 後H + '（多了 ' + 差 + 'px ＝狀態列被收掉了）'
+        : '⚠ 進去了但高度沒變（' + 前H + ' → ' + 後H + '）＝這台裝置收不掉狀態列';
+      列('t4', rows4);
+    }, 600);
+  }
+
+  try {
+    /* ⚠ webkit 前綴版不回傳 Promise，直接串 .then 會 TypeError */
+    var r = 全螢幕函式.call(el4, { navigationUI: 'hide' });
+    if (r && r.then) {
+      r.then(收尾)['catch'](function (e) {
+        rows4[6][1] = '❌ 被拒絕：' + ((e && e.message) || e);
+        列('t4', rows4);
+      });
+    } else {
+      收尾();
+    }
+  } catch (e) {
+    rows4[6][1] = '❌ 例外：' + e.message;
+    列('t4', rows4);
+  }
+});
 
 列('t3', [
   ['螢幕 screen', screen.width + ' × ' + screen.height],

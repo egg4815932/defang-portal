@@ -141,7 +141,10 @@ window.addEventListener('message', function (e) {
      下面那個「寬度落差」判斷會讓 iPhone／iPad／桌機／無挖孔機種全部自動跳過這一段。 */
 (function () {
   var el = document.documentElement;
-  if (!el.requestFullscreen) return;                  // iPhone 從這裡離開
+  /* Safari 16.4 以前只有 webkit 前綴，iPad 上很可能走這條。
+     ⚠ iPhone 兩個都不存在（非 video 元素不支援 Fullscreen API）＝仍然從這裡離開，行為不變。 */
+  var 請求全螢幕 = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!請求全螢幕) return;                            // iPhone 從這裡離開
 
   /* 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示。
      ⚠ initial-scale 現在固定是 1（80% 改由 CSS 的 --app-scale 負責），SCALE 讀出來就是 1，
@@ -155,11 +158,32 @@ window.addEventListener('message', function (e) {
   var m = vp && /initial-scale\s*=\s*([\d.]+)/.exec(vp.content);
   var 行動裝置 = matchMedia('(pointer: coarse)').matches;
   var SCALE = (行動裝置 && m) ? parseFloat(m[1]) : 1;
-  if (Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
+  /* ⚠ 2026-08-06 補的例外 —— iPad 原本永遠卡在這一行。
+       這道守門是為了「Android 挖孔」寫的：沒有被切掉的視窗就不必進全螢幕，免得白跳一個提示。
+       但 iPad 沒有挖孔，screen.width - innerWidth 算出來是 0（或負數）→ 直接 return
+       ＝**整段全螢幕從來沒有在 iPad 上執行過**。
+
+       而 iPad 進全螢幕是有東西可以拿的：iOS 主畫面 App 一律會畫一條系統狀態列
+       （時間／日期／電量／Wi-Fi），黏在畫面最上緣壓著我們的 UI。
+       那條列**沒有任何網頁 API 可以關掉**（原生 App 才有 prefersStatusBarHidden），
+       唯一的可能就是 Fullscreen API —— iPad Safari 支援非 video 元素的全螢幕（iPhone 不支援）。
+
+       所以：iOS 主畫面 App 一律放行，不看寬度落差。
+       ⚠ 只認 navigator.standalone（iOS／iPadOS 官方 API，最可靠）——
+         別改用 display-mode: fullscreen，我們的 manifest 本身就是 fullscreen，分不出來
+         （2026-08-05 安裝鈕在 iPad 上消失就是踩這個坑）。
+       ⚠ Android／桌機的 navigator.standalone 是 undefined ＝行為完全不變。
+       ⚠ iPhone 走不到這裡（上面那道 requestFullscreen 偵測就 return 了）。 */
+  var iOS主畫面App = navigator.standalone === true;
+  if (!iOS主畫面App && Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
   function go() {
-    if (document.fullscreenElement) return;   // 已經在全螢幕，重複請求只會在 console 報錯
-    return el.requestFullscreen({ navigationUI: 'hide' })['catch'](function () {});
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;   // 已經在全螢幕，重複請求只會在 console 報錯
+    /* ⚠ webkit 前綴版不回傳 Promise，直接串 .catch 會 TypeError → 要先確認回傳值有 catch */
+    try {
+      var r = 請求全螢幕.call(el, { navigationUI: 'hide' });
+      if (r && r['catch']) r['catch'](function () {});
+    } catch (e) {}
   }
 
   /* ===== 全螢幕由「系統內的按鈕」觸發（2026-08-05）=====
