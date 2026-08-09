@@ -51,7 +51,8 @@
      要調整比例只改 --app-scale 這一個數字。 */
   :root{ --app-scale:.8; --app-bottom-inset:0px }
   /* iOS 主畫面 App／Fullscreen API 會保留底部 home indicator 區。
-     這一區若仍由跨網域 iframe 佔滿，iOS 可能露出 Google 外層的白底；
+     跨網域 GAS iframe 必須往這一區 overscan，再由殼頁的 overflow:hidden 裁掉超出部分；
+     若反過來縮短 iframe，只會把白邊換成殼頁底色，內容與影片仍然用不到該區。
      iPhone 內頁假旋轉 90 度後，實體底部會成為使用者看到的畫面右側。
      安全區必須在最外層殼頁處理：iframe 內的 env(safe-area-inset-*) 永遠讀不到。
      一般 iOS 優先採系統回報值；主畫面／全螢幕時保留 20px fallback，避免 WebKit 回報 0。 */
@@ -66,7 +67,7 @@
     html,body{ overflow:hidden }
     iframe{
       width:calc(100% / var(--app-scale));
-      height:calc((100% - var(--app-bottom-inset)) / var(--app-scale));
+      height:calc((100% + var(--app-bottom-inset)) / var(--app-scale));
       transform:scale(var(--app-scale));
       transform-origin:0 0;
     }
