@@ -130,29 +130,51 @@ if (是iPhone裝置) {
 /* 外殼在 iOS 安全區外 overscan，並把真正被裁掉的內頁尺寸回傳給 GAS。 */
 var appViewportTarget = null;
 var appViewportOrigin = '';
+var appViewportSyncTimer = null;
+function clampViewportInset(value) {
+  value = Number(value);
+  return Math.min(96, Math.max(0, isFinite(value) ? value : 0));
+}
 function sendViewportInsets() {
   if (!appViewportTarget) return;
   var frame = document.querySelector('iframe');
   if (!frame) return;
   var rect = frame.getBoundingClientRect();
   var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-scale')) || 1;
+  var viewportWidth = window.innerWidth;
+  var viewportHeight = window.innerHeight;
+  var landscape = viewportWidth > viewportHeight;
+  var right = clampViewportInset((rect.right - viewportWidth) / scale);
+  var bottom = clampViewportInset((rect.bottom - viewportHeight) / scale);
+  /* iPhone 直式只顯示轉向提醒，不使用外殼裁切；清掉上一個橫式留下的 inset，
+     避免連續旋轉的中間尺寸把內頁寬高扣到只剩背景。 */
+  if (是iPhone裝置 && !landscape) right = bottom = 0;
   try {
     appViewportTarget.postMessage({
       defang: 'viewport-insets',
-      right: Math.max(0, (rect.right - window.innerWidth) / scale),
-      bottom: Math.max(0, (rect.bottom - window.innerHeight) / scale)
+      right: right,
+      bottom: bottom,
+      landscape: landscape,
+      viewportWidth: viewportWidth,
+      viewportHeight: viewportHeight
     }, appViewportOrigin);
   } catch (e) {}
+}
+function scheduleViewportInsets(delay) {
+  clearTimeout(appViewportSyncTimer);
+  appViewportSyncTimer = setTimeout(sendViewportInsets, typeof delay === 'number' ? delay : 240);
 }
 window.addEventListener('message', function (e) {
   if (!e.data || e.data.defang !== 'viewport-ready') return;
   if (String(e.origin).indexOf('.google') < 0) return;
   appViewportTarget = e.source;
   appViewportOrigin = e.origin;
-  sendViewportInsets();
+  scheduleViewportInsets(0);
 });
-window.addEventListener('resize', sendViewportInsets);
-window.addEventListener('orientationchange', function () { setTimeout(sendViewportInsets, 100); });
+window.addEventListener('resize', scheduleViewportInsets);
+window.addEventListener('orientationchange', function () { scheduleViewportInsets(360); });
+window.addEventListener('pageshow', function () { scheduleViewportInsets(0); });
+if (window.visualViewport) visualViewport.addEventListener('resize', scheduleViewportInsets);
 
 /* ===== 安裝到主畫面（2026-08-05）=====
    系統同意頁右邊那顆「安裝」鈕按下去時，內層會 postMessage 過來，我們試著跳出原生安裝視窗。
