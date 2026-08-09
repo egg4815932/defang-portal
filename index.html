@@ -50,11 +50,10 @@
        iframe 內部 innerWidth 與 clientX 同時都是 1142 那個座標系，內部完全無感。
      ⚠ 只在 pointer:coarse 套用：桌機本來就忽略 viewport meta＝電腦版行為維持不變。
      要調整比例只改 --app-scale 這一個數字。 */
-  :root{ --app-scale:.8; --app-bottom-inset:0px; --app-right-inset:0px; --app-overscan-guard:0px }
+  :root{ --app-scale:.8; --app-bottom-inset:0px; --app-overscan-guard:0px }
   /* iOS 主畫面 App／Fullscreen API 會保留底部 home indicator 區。
      跨網域 GAS iframe 必須往這一區 overscan，再由殼頁的 overflow:hidden 裁掉超出部分；
      若反過來縮短 iframe，只會把白邊換成殼頁底色，內容與影片仍然用不到該區。
-     iPhone 現在要求實際橫放，所以右側安全區要獨立往外 overscan。
      安全區必須在最外層殼頁處理：iframe 內的 env(safe-area-inset-*) 永遠讀不到。
      一般 iOS 優先採系統回報值；主畫面／全螢幕時保留 20px fallback，避免 WebKit 回報 0。 */
   html.ios-device{
@@ -66,16 +65,11 @@
   html.ios-device:-webkit-full-screen{
     --app-bottom-inset:max(env(safe-area-inset-bottom,0px),20px)
   }
-  @media (orientation:landscape){
-    html.iphone-device{
-      --app-right-inset:max(env(safe-area-inset-right,0px),48px)
-    }
-  }
   @media (pointer: coarse){
     /* iframe 版面比視窗大，不讓殼頁自己長出捲軸 */
     html,body{ overflow:hidden }
     iframe{
-      width:calc((100% + var(--app-right-inset)) / var(--app-scale));
+      width:calc(100% / var(--app-scale));
       height:calc((100% + var(--app-bottom-inset) + var(--app-overscan-guard)) / var(--app-scale));
       transform:scale(var(--app-scale));
       transform-origin:0 0;
@@ -83,9 +77,15 @@
   }
   .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
-  /* ⛔ 這裡原本有 #fsFallback ——「點一下用滿整個螢幕」的備援鈕，已於 2026-08-05 移除。
-     使用者：「點一下進入全螢幕這個按鈕很煩」。改成系統內的各式按鈕（同意／登入／側欄…）
-     按下去時由內層 postMessage 通知我們，順勢進全螢幕＝融入操作，不再多一個過場。 */
+  #iphoneFullscreenBtn{display:none;position:fixed;right:max(env(safe-area-inset-right,0px),12px);
+    bottom:max(env(safe-area-inset-bottom,0px),12px);z-index:2147483647;height:40px;padding:0 14px;
+    align-items:center;justify-content:center;gap:7px;border:1px solid rgba(255,255,255,.95);border-radius:20px;
+    color:#fff;background:rgba(43,126,67,.92);box-shadow:0 5px 16px rgba(30,66,41,.32);
+    font:700 14px/1 "Microsoft JhengHei",sans-serif;letter-spacing:1px;-webkit-tap-highlight-color:transparent}
+  html.iphone-device.ios-standalone.fs-supported:not(.fs-active) #iphoneFullscreenBtn{display:flex}
+  /* 一般裝置仍由內層按鈕的 postMessage 順勢進全螢幕，不增加過場。
+     只有支援 Fullscreen API 的 iPhone 主畫面 App 顯示一次性按鈕：iOS 不保證跨 iframe
+     的 postMessage 保留 user activation，直接手勢是收掉原生狀態列／home indicator 的可靠入口。 */
   /* ⛔ 這裡原本有 #versionBadge —— 常駐在右上角的 v1.0.0 圓標，已於 2026-08-05 移除。
      使用者要求「不要佔用到整個程式」：那顆標籤是 fixed 且 z-index 2147483646，
      永遠壓在系統畫面最上層。版本資訊改成點進去才看 ——
@@ -109,11 +109,13 @@
     src="https://script.google.com/macros/s/AKfycbyvILyQU2BWYuzaCp0lo135aXTyRZOX3NzFjVvSyLLxtCXtmCQun4XPsGhEcvbcEgxN/exec?shell=20260809-safearea2"
     allow="autoplay *; encrypted-media *; fullscreen *; geolocation *; vibrate *"
     allowfullscreen></iframe>
+  <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
 /* iOS 安全區只能由這個最外層殼頁處理；iPadOS 13+ 常偽裝成 Mac。 */
 var 是iOS裝置 = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+var 是iPhone裝置 = /iPhone|iPod/.test(navigator.userAgent);
 var 是獨立App = navigator.standalone === true ||
                 matchMedia('(display-mode: standalone)').matches ||
                 matchMedia('(display-mode: fullscreen)').matches;
@@ -121,7 +123,7 @@ if (是iOS裝置) {
   document.documentElement.classList.add('ios-device');
   if (是獨立App) document.documentElement.classList.add('ios-standalone');
 }
-if (/iPhone|iPod/.test(navigator.userAgent)) {
+if (是iPhone裝置) {
   document.documentElement.classList.add('iphone-device');
 }
 
@@ -198,15 +200,14 @@ window.addEventListener('message', function (e) {
      螢幕就能偽裝成系統畫面），Chromium 上要求隱藏它的票都掛 Security 標籤。
      navigationUI:'hide' 管的是導覽列，不是這個提示。使用者已知並接受。
 
-   ⚠ iPhone 不支援非 video 元素的 Fullscreen API，但它也不需要 ——
-     iOS 主畫面 App 靠 viewport-fit=cover + black-translucent 原生就會鋪到瀏海底下。
-     下面那個「寬度落差」判斷會讓 iPhone／iPad／桌機／無挖孔機種全部自動跳過這一段。 */
+   iPhone 舊版 WebKit 不支援非 video 元素的 Fullscreen API；新版若提供 requestFullscreen，
+   會在使用者按系統按鈕或下方「完整畫面」時進入，真正收掉狀態列與 home indicator。 */
 (function () {
   var el = document.documentElement;
-  /* Safari 16.4 以前只有 webkit 前綴，iPad 上很可能走這條。
-     ⚠ iPhone 兩個都不存在（非 video 元素不支援 Fullscreen API）＝仍然從這裡離開，行為不變。 */
+  /* Safari 舊版可能只有 webkit 前綴；不支援的 iPhone 會安全離開，維持一般主畫面 App。 */
   var 請求全螢幕 = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!請求全螢幕) return;                            // iPhone 從這裡離開
+  if (!請求全螢幕) return;
+  if (是iPhone裝置) document.documentElement.classList.add('fs-supported');
 
   /* 視窗寬度沒被切掉就不必進全螢幕，免得白白跳一個提示。
      ⚠ initial-scale 現在固定是 1（80% 改由 CSS 的 --app-scale 負責），SCALE 讀出來就是 1，
@@ -235,7 +236,7 @@ window.addEventListener('message', function (e) {
          別改用 display-mode: fullscreen，我們的 manifest 本身就是 fullscreen，分不出來
          （2026-08-05 安裝鈕在 iPad 上消失就是踩這個坑）。
        ⚠ Android／桌機的 navigator.standalone 是 undefined ＝行為完全不變。
-       ⚠ iPhone 走不到這裡（上面那道 requestFullscreen 偵測就 return 了）。 */
+       支援 requestFullscreen 的新版 iPhone 也會由這條放行。 */
   var iOS主畫面App = navigator.standalone === true;
   if (!iOS主畫面App && Math.round(screen.width - window.innerWidth * SCALE) <= 1) return;
 
@@ -243,9 +244,27 @@ window.addEventListener('message', function (e) {
     if (document.fullscreenElement || document.webkitFullscreenElement) return;   // 已經在全螢幕，重複請求只會在 console 報錯
     /* ⚠ webkit 前綴版不回傳 Promise，直接串 .catch 會 TypeError → 要先確認回傳值有 catch */
     try {
-      var r = 請求全螢幕.call(el, { navigationUI: 'hide' });
+      /* iPhone 26.x 的實作對 options 支援仍不一致；不傳 options 是最可靠的標準呼叫。
+         Android／iPad 保留 navigationUI:'hide' 的既有行為。 */
+      var r = 是iPhone裝置 ? 請求全螢幕.call(el) : 請求全螢幕.call(el, { navigationUI: 'hide' });
       if (r && r['catch']) r['catch'](function () {});
     } catch (e) {}
+  }
+
+  function 同步全螢幕狀態() {
+    document.documentElement.classList.toggle('fs-active',
+      !!(document.fullscreenElement || document.webkitFullscreenElement));
+  }
+  document.addEventListener('fullscreenchange', 同步全螢幕狀態);
+  document.addEventListener('webkitfullscreenchange', 同步全螢幕狀態);
+  同步全螢幕狀態();
+
+  var iphoneFullscreenBtn = document.getElementById('iphoneFullscreenBtn');
+  if (iphoneFullscreenBtn) {
+    iphoneFullscreenBtn.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      go();
+    });
   }
 
   /* ===== 全螢幕由「系統內的按鈕」觸發（2026-08-05）=====
