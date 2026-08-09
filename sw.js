@@ -32,5 +32,8 @@ self.addEventListener('fetch', function (event) {
        空 handler 會被 Chrome 判定成 no-op 而可能不算數，安裝條件就白做了。
      ⚠ 失敗時原樣把錯誤丟回去，讓瀏覽器顯示它平常的離線頁面
        （這頁本來就需要網路才能用，SW 不該假裝自己能離線運作）。 */
-  event.respondWith(fetch(event.request));
+  /* 導覽頁必須略過 GitHub Pages 的 HTTP 快取，否則已安裝的 iOS App
+     會在發布後數分鐘仍開到舊 index.html，看起來就像修正完全沒生效。 */
+  var options = event.request.mode === 'navigate' ? { cache: 'no-store' } : undefined;
+  event.respondWith(fetch(event.request, options));
 });
