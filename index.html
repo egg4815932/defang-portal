@@ -49,11 +49,11 @@
        iframe 內部 innerWidth 與 clientX 同時都是 1142 那個座標系，內部完全無感。
      ⚠ 只在 pointer:coarse 套用：桌機本來就忽略 viewport meta＝電腦版行為維持不變。
      要調整比例只改 --app-scale 這一個數字。 */
-  :root{ --app-scale:.8; --app-bottom-inset:0px }
+  :root{ --app-scale:.8; --app-bottom-inset:0px; --app-right-inset:0px }
   /* iOS 主畫面 App／Fullscreen API 會保留底部 home indicator 區。
      跨網域 GAS iframe 必須往這一區 overscan，再由殼頁的 overflow:hidden 裁掉超出部分；
      若反過來縮短 iframe，只會把白邊換成殼頁底色，內容與影片仍然用不到該區。
-     iPhone 內頁假旋轉 90 度後，實體底部會成為使用者看到的畫面右側。
+     iPhone 現在要求實際橫放，所以右側安全區要獨立往外 overscan。
      安全區必須在最外層殼頁處理：iframe 內的 env(safe-area-inset-*) 永遠讀不到。
      一般 iOS 優先採系統回報值；主畫面／全螢幕時保留 20px fallback，避免 WebKit 回報 0。 */
   html.ios-device{ --app-bottom-inset:env(safe-area-inset-bottom,0px) }
@@ -62,11 +62,16 @@
   html.ios-device:-webkit-full-screen{
     --app-bottom-inset:max(env(safe-area-inset-bottom,0px),20px)
   }
+  @media (orientation:landscape){
+    html.iphone-device{
+      --app-right-inset:max(env(safe-area-inset-right,0px),48px)
+    }
+  }
   @media (pointer: coarse){
     /* iframe 版面比視窗大，不讓殼頁自己長出捲軸 */
     html,body{ overflow:hidden }
     iframe{
-      width:calc(100% / var(--app-scale));
+      width:calc((100% + var(--app-right-inset)) / var(--app-scale));
       height:calc((100% + var(--app-bottom-inset)) / var(--app-scale));
       transform:scale(var(--app-scale));
       transform-origin:0 0;
@@ -109,6 +114,36 @@ if (是iOS裝置) {
   document.documentElement.classList.add('ios-device');
   if (navigator.standalone === true) document.documentElement.classList.add('ios-standalone');
 }
+if (/iPhone|iPod/.test(navigator.userAgent)) {
+  document.documentElement.classList.add('iphone-device');
+}
+
+/* 外殼在 iOS 安全區外 overscan，並把真正被裁掉的內頁尺寸回傳給 GAS。 */
+var appViewportTarget = null;
+var appViewportOrigin = '';
+function sendViewportInsets() {
+  if (!appViewportTarget) return;
+  var frame = document.querySelector('iframe');
+  if (!frame) return;
+  var rect = frame.getBoundingClientRect();
+  var scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-scale')) || 1;
+  try {
+    appViewportTarget.postMessage({
+      defang: 'viewport-insets',
+      right: Math.max(0, (rect.right - window.innerWidth) / scale),
+      bottom: Math.max(0, (rect.bottom - window.innerHeight) / scale)
+    }, appViewportOrigin);
+  } catch (e) {}
+}
+window.addEventListener('message', function (e) {
+  if (!e.data || e.data.defang !== 'viewport-ready') return;
+  if (String(e.origin).indexOf('.google') < 0) return;
+  appViewportTarget = e.source;
+  appViewportOrigin = e.origin;
+  sendViewportInsets();
+});
+window.addEventListener('resize', sendViewportInsets);
+window.addEventListener('orientationchange', function () { setTimeout(sendViewportInsets, 100); });
 
 /* ===== 安裝到主畫面（2026-08-05）=====
    系統同意頁右邊那顆「安裝」鈕按下去時，內層會 postMessage 過來，我們試著跳出原生安裝視窗。
