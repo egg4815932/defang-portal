@@ -6,7 +6,7 @@
      ⛔ initial-scale 刻意保持 1 —— 「手機顯示 80%」已經改由下面的 --app-scale（CSS transform）負責。
         原因見下方那段註解：initial-scale 一進全螢幕就會被 Chrome 作廢。
      ⚠ 只有行動裝置會讀 viewport meta，桌機瀏覽器一律忽略。 -->
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>德芳連鎖藥局 內部查詢系統</title>
 
 <!-- ========== PWA：讓「加到主畫面」變成獨立視窗 App，而不是開瀏覽器的捷徑 ==========
@@ -28,7 +28,8 @@
   /* 底色從白色改成品牌漸層：全螢幕時 iframe 以外露出的部分才不會是刺眼的白（深色模式下是黑） */
   html,body{margin:0;height:100%;
     background-color:#CDEBD5;
-    background-image:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%)}
+    background-image:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%);
+    touch-action:pan-x pan-y}
   /* dvh 才抓得到「當下真正看得到的高度」——手機網址列收放時視窗高度是會變的 */
   @supports (height:100dvh){ html,body{height:100dvh} }
   iframe{display:block;width:100%;height:100%;border:0;background:#CDEBD5}
@@ -112,6 +113,19 @@
   <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
+/* PWA 殼頁禁止瀏覽器原生 pinch zoom。內層 GAS 另有相同防線；雙層都擋才能避免
+   跨網域 iframe 縮放時連續觸發 outer/inner visual viewport 重排，把手機 WebView 撐垮。 */
+(function 禁止頁面原生縮放() {
+  function 擋縮放(e) { if (e.cancelable) e.preventDefault(); }
+  function 擋多指(e) { if (e.touches && e.touches.length > 1) 擋縮放(e); }
+  document.addEventListener('touchstart', 擋多指, { passive: false, capture: true });
+  document.addEventListener('touchmove', 擋多指, { passive: false, capture: true });
+  document.addEventListener('gesturestart', 擋縮放, { passive: false, capture: true });
+  document.addEventListener('gesturechange', 擋縮放, { passive: false, capture: true });
+  document.addEventListener('gestureend', 擋縮放, { passive: false, capture: true });
+  document.addEventListener('wheel', function (e) { if (e.ctrlKey) 擋縮放(e); }, { passive: false });
+})();
+
 /* iOS 安全區只能由這個最外層殼頁處理；iPadOS 13+ 常偽裝成 Mac。 */
 var 是iOS裝置 = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
