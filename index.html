@@ -145,6 +145,7 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
+var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 function clampViewportInset(value) {
   value = Number(value);
   return Math.min(96, Math.max(0, isFinite(value) ? value : 0));
@@ -184,6 +185,32 @@ window.addEventListener('message', function (e) {
   appViewportTarget = e.source;
   appViewportOrigin = e.origin;
   scheduleViewportInsets(0);
+});
+
+/* GAS 內容位在 Google 的跨網域 sandbox iframe；手機鎖屏時 WebView 可能只重建內層 iframe。
+   登入票證因此同步存一份在固定來源的 GitHub PWA 外殼，內層重建後再取回。
+   只接受已用 viewport-ready 握手過的同一個 GAS 視窗，避免其他 frame 寫入登入資料。 */
+window.addEventListener('message', function (e) {
+  if (!e.data || String(e.data.defang).indexOf('login-session-') !== 0) return;
+  if (e.source !== appViewportTarget || e.origin !== appViewportOrigin) return;
+  try {
+    if (e.data.defang === 'login-session-save') {
+      var record = e.data.record;
+      if (record && record.id && record.token) {
+        localStorage.setItem(LOGIN_SESSION_KEY, JSON.stringify(record));
+      }
+      return;
+    }
+    if (e.data.defang === 'login-session-clear') {
+      localStorage.removeItem(LOGIN_SESSION_KEY);
+      return;
+    }
+    if (e.data.defang === 'login-session-request') {
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY) || 'null'); } catch (ignore) {}
+      e.source.postMessage({ defang: 'login-session-value', record: saved }, e.origin);
+    }
+  } catch (ignore) {}
 });
 window.addEventListener('resize', scheduleViewportInsets);
 window.addEventListener('orientationchange', function () { scheduleViewportInsets(360); });
