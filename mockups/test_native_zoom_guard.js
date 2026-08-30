@@ -14,7 +14,10 @@ const checks = [
   ['standalone 底部 overscan 僅限 iPad', /html\.ios-device:not\(\.iphone-device\)\.ios-standalone,[\s\S]*?--app-bottom-inset:max\(/.test(html)],
   ['iPhone iframe 回到一般排版基準', /html\.iphone-device iframe\{position:static;top:auto;left:auto\}/.test(html)],
   ['iPad iframe absolute 合成基準未動', /iframe\{\s*display:block;position:absolute;top:0;left:0;width:100%;height:100%/.test(html)],
-  ['iPad guard 不回報內頁裁切', /rect\.bottom - viewportHeight - overscanGuard/.test(html)]
+  ['iPad guard 不回報內頁裁切', /rect\.bottom - viewportHeight - overscanGuard/.test(html)],
+  ['iPhone 讀取左右安全區', /--app-safe-left:env\(safe-area-inset-left,0px\)[\s\S]*--app-safe-right:env\(safe-area-inset-right,0px\)/.test(html)],
+  ['iPhone 播放中心採左右安全區差', /\(safeRight - safeLeft\) \/ \(2 \* scale\)/.test(html)],
+  ['播放中心偏移會傳入 GAS', /centerOffsetX: centerOffsetX/.test(html)]
 ];
 
 let passed = 0;
