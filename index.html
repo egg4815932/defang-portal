@@ -75,6 +75,8 @@
   iframe{
     display:block;position:absolute;top:0;left:0;width:100%;height:100%;border:0;background:#F6F9F6
   }
+  /* iPad／桌機不建立額外盒子，iframe 仍維持 ef6a4ea 的直接合成基準。 */
+  #appFrameViewport{display:contents}
   html.app-ready #bootStage{opacity:0;visibility:hidden}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
@@ -130,10 +132,20 @@
       transform:scale(var(--app-scale));
       transform-origin:0 0;
     }
-    /* iOS WebKit 對「absolute + transformed 跨網域 iframe」裡的 fixed 元件會套錯可視中心。
-       iPhone 回到精品啟動前已穩定的一般排版；bootStage 仍以 z-index 疊在上方，不受影響。
-       iPad 不可套這條，否則會破壞已確認無底線的合成基準。 */
-    html.iphone-device iframe{position:static;top:auto;left:auto}
+    /* iPhone WebKit 會把直接 transform 的跨網域 iframe 與內頁 fixed 舞台合成到錯的原點，
+       因此側欄、主畫面、講義會一起右偏，底部也一起被裁。把完全相同的 80% 縮放移到
+       外層普通容器，iframe 本身只負責 100% 鋪滿，不再直接 transform。
+       iPad 不套這兩條，仍由上方原始 iframe 規則直接縮放，避免破壞實機通過的底線基準。 */
+    html.iphone-device #appFrameViewport{
+      display:block;
+      width:calc(100% / var(--app-scale));
+      height:calc((100% + var(--app-bottom-inset) + var(--app-overscan-guard)) / var(--app-scale));
+      transform:scale(var(--app-scale));
+      transform-origin:0 0;
+    }
+    html.iphone-device iframe{
+      position:static;top:auto;left:auto;width:100%;height:100%;transform:none
+    }
   }
   #iphoneFullscreenBtn{display:none;position:fixed;right:max(env(safe-area-inset-right,0px),12px);
     bottom:max(env(safe-area-inset-bottom,0px),12px);z-index:2147483647;height:40px;padding:0 14px;
@@ -169,10 +181,12 @@
        · 要讓員工拿到新功能：跑 `發布更新.bat`（＝把雲端 HEAD 拍成新的正式版照片）
        · 開發中要自己先試：跑 `更新測試台.bat`，開測試部署的 /exec 網址看，不會影響員工
        ⛔ 別再把這行改回測試部署 —— 那樣一來我每次重拍測試台，員工就會立刻吃到未驗證的版本。 -->
-  <iframe
-    src="https://script.google.com/macros/s/AKfycbyvILyQU2BWYuzaCp0lo135aXTyRZOX3NzFjVvSyLLxtCXtmCQun4XPsGhEcvbcEgxN/exec?shell=20260809-safearea2"
-    allow="autoplay *; encrypted-media *; fullscreen *; geolocation *; vibrate *"
-    allowfullscreen></iframe>
+  <div id="appFrameViewport">
+    <iframe
+      src="https://script.google.com/macros/s/AKfycbyvILyQU2BWYuzaCp0lo135aXTyRZOX3NzFjVvSyLLxtCXtmCQun4XPsGhEcvbcEgxN/exec?shell=20260809-safearea2"
+      allow="autoplay *; encrypted-media *; fullscreen *; geolocation *; vibrate *"
+      allowfullscreen></iframe>
+  </div>
   <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
