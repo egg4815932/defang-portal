@@ -24,6 +24,15 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
 <link rel="preload" as="image" href="logo-brand.png">
+<script>
+  /* iPhone 必須在第一個 iframe 建立前就走一般排版。若等到 body 後方才掛 class，
+     WebKit 會先用 absolute + transform 建立跨網域合成座標；後來即使 computed style
+     已變成 static，內頁的 fixed 舞台仍可能沿用第一次的偏移與裁切。
+     只提前 iPhone class；iPad 的 ef6a4ea 合成建立順序完全不動。 */
+  if (/iPhone|iPod/.test(navigator.userAgent)) {
+    document.documentElement.classList.add('iphone-device');
+  }
+</script>
 
 <style>
   @font-face{
