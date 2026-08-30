@@ -97,10 +97,14 @@
      安全區必須在最外層殼頁處理：iframe 內的 env(safe-area-inset-*) 永遠讀不到。
      一般 iOS 優先採系統回報值；主畫面／全螢幕時保留 20px fallback，避免 WebKit 回報 0。 */
   html.ios-device{
-    --app-bottom-inset:env(safe-area-inset-bottom,0px);
-    /* iPad WebKit 在 transform:scale(.8) 的 iframe 邊緣會留下數個實體像素的合成縫。
-       這 16px 只把畫面延伸到螢幕外，不算進內頁的內容安全距離。 */
+    --app-bottom-inset:env(safe-area-inset-bottom,0px)
+  }
+  /* 16px 合成縫只存在 iPad；iPhone 若也加高，影片會依錯誤長寬比放大並偏移。 */
+  html.ios-device:not(.iphone-device){
     --app-overscan-guard:16px
+  }
+  html.ios-device.iphone-device{
+    --app-overscan-guard:0px
   }
   html.ios-device.ios-standalone,
   html.ios-device:fullscreen,
