@@ -268,10 +268,44 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
+var PWA_BUILD = '20260831-iphone-viewport-diagnostics';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
+document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
   value = Number(value);
   return Math.min(96, Math.max(0, isFinite(value) ? value : 0));
+}
+function roundViewportValue(value) {
+  value = Number(value);
+  return isFinite(value) ? Math.round(value * 100) / 100 : null;
+}
+function viewportRectSnapshot(element) {
+  if (!element) return null;
+  var rect = element.getBoundingClientRect();
+  return [rect.left,rect.top,rect.right,rect.bottom].map(roundViewportValue);
+}
+function collectViewportDiagnostics(frame) {
+  var visual = window.visualViewport;
+  var wrapper = document.getElementById('appFrameViewport');
+  return {
+    build:PWA_BUILD,
+    url:location.href,
+    standalone:是獨立App,
+    inner:[window.innerWidth,window.innerHeight],
+    client:[document.documentElement.clientWidth,document.documentElement.clientHeight],
+    visual:visual ? [visual.width,visual.height,visual.offsetLeft,visual.offsetTop,visual.scale].map(roundViewportValue) : null,
+    body:viewportRectSnapshot(document.body),
+    wrapper:viewportRectSnapshot(wrapper),
+    frame:viewportRectSnapshot(frame),
+    viewportVars:[
+      getComputedStyle(document.documentElement).getPropertyValue('--app-scale').trim(),
+      getComputedStyle(document.documentElement).getPropertyValue('--app-bottom-inset').trim(),
+      getComputedStyle(document.documentElement).getPropertyValue('--app-overscan-guard').trim()
+    ],
+    wrapperTransform:wrapper ? getComputedStyle(wrapper).transform : '',
+    frameTransform:getComputedStyle(frame).transform,
+    sw:navigator.serviceWorker && navigator.serviceWorker.controller ? navigator.serviceWorker.controller.scriptURL : 'none'
+  };
 }
 function sendViewportInsets() {
   if (!appViewportTarget) return;
@@ -284,8 +318,7 @@ function sendViewportInsets() {
   var landscape = viewportWidth > viewportHeight;
   var right = clampViewportInset((rect.right - viewportWidth) / scale);
   var overscanGuard = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-overscan-guard')) || 0;
-  /* iPad 的 16px guard 只蓋合成縫，不回報給內頁；iPhone 恢復修 iPad 前的完整裁切值，
-     讓 GAS 內頁用同一組舊版 body／容器規則扣回真正可見矩形。 */
+  /* iPad 的 16px guard 只蓋合成縫，不回報給內頁；iPhone 回報完整裁切值。 */
   var reportedGuard = 是iPhone裝置 ? 0 : overscanGuard;
   var bottom = clampViewportInset((rect.bottom - viewportHeight - reportedGuard) / scale);
   /* iPhone 直式只顯示轉向提醒，不使用外殼裁切；清掉上一個橫式留下的 inset，
@@ -298,7 +331,8 @@ function sendViewportInsets() {
       bottom: bottom,
       landscape: landscape,
       viewportWidth: viewportWidth,
-      viewportHeight: viewportHeight
+      viewportHeight: viewportHeight,
+      diagnostics: collectViewportDiagnostics(frame)
     }, appViewportOrigin);
   } catch (e) {}
 }
