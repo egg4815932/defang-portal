@@ -38,11 +38,9 @@
     overflow:hidden;touch-action:pan-x pan-y}
   /* dvh 才抓得到「當下真正看得到的高度」——手機網址列收放時視窗高度是會變的 */
   @supports (height:100dvh){ html,body{height:100dvh} }
-  body{position:relative}
-
-  /* 精品啟動舞台：它是 iframe 背後的正常頁面內容，不是 fixed 遮罩，也不改變安全區尺寸。 */
+  /* 精品啟動舞台：由外殼暫時疊在 iframe 上方，交棒後整個移除；不是 fixed，也不修改 iframe 合成狀態。 */
   #bootStage{
-    position:relative;z-index:0;width:100%;height:100%;display:grid;place-items:center;
+    position:absolute;z-index:2;inset:0;display:grid;place-items:center;
     overflow:hidden;box-sizing:border-box;padding:24px;
     font-family:"LINE Seed TW","Microsoft JhengHei","PingFang TC",sans-serif;
     opacity:1;visibility:visible;
@@ -65,10 +63,8 @@
   }
 
   iframe{
-    display:block;position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;border:0;background:#F6F9F6;
-    visibility:hidden;pointer-events:none
+    display:block;position:absolute;top:0;left:0;width:100%;height:100%;border:0;background:#F6F9F6
   }
-  html.app-ready iframe{visibility:visible;pointer-events:auto}
   html.app-ready #bootStage{opacity:0;visibility:hidden}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
@@ -175,7 +171,7 @@ function revealApp() {
       var stage = document.getElementById('bootStage');
       if (stage) {
         stage.setAttribute('aria-hidden','true');
-        setTimeout(function () { stage.hidden = true; }, 360);
+        setTimeout(function () { stage.remove(); }, 360);
       }
     });
   });
