@@ -8,7 +8,13 @@ const checks = [
   ['touchstart/touchmove 多指守門', ['touchstart', 'touchmove'].every(event => html.includes(`addEventListener('${event}', 擋多指, { passive: false, capture: true })`))],
   ['iOS gesture 守門完整', ['gesturestart', 'gesturechange', 'gestureend'].every(event => html.includes(`addEventListener('${event}', 擋縮放`))],
   ['Ctrl+滾輪縮放守門', /addEventListener\('wheel',[\s\S]*?e\.ctrlKey/.test(html)],
-  ['viewport 方向與安全區同步仍保留', /visualViewport\.addEventListener\('resize', scheduleViewportInsets\)/.test(html)]
+  ['viewport 方向與安全區同步仍保留', /visualViewport\.addEventListener\('resize', scheduleViewportInsets\)/.test(html)],
+  ['iPad 合成 guard 維持 16px', /html\.ios-device:not\(\.iphone-device\)\{\s*--app-overscan-guard:16px/.test(html)],
+  ['iPhone 外殼維持精確高度', /html\.ios-device\.iphone-device\{\s*--app-bottom-inset:0px;\s*--app-overscan-guard:0px/.test(html)],
+  ['standalone 底部 overscan 僅限 iPad', /html\.ios-device:not\(\.iphone-device\)\.ios-standalone,[\s\S]*?--app-bottom-inset:max\(/.test(html)],
+  ['iPhone iframe 回到一般排版基準', /html\.iphone-device iframe\{position:static;top:auto;left:auto\}/.test(html)],
+  ['iPad iframe absolute 合成基準未動', /iframe\{\s*display:block;position:absolute;top:0;left:0;width:100%;height:100%/.test(html)],
+  ['iPad guard 不回報內頁裁切', /rect\.bottom - viewportHeight - overscanGuard/.test(html)]
 ];
 
 let passed = 0;

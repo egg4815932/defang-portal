@@ -99,16 +99,18 @@
   html.ios-device{
     --app-bottom-inset:env(safe-area-inset-bottom,0px)
   }
-  /* 16px 合成縫只存在 iPad；iPhone 若也加高，影片會依錯誤長寬比放大並偏移。 */
+  /* iPad 才需要往 home indicator 區 overscan；iPhone 使用精確可見高度。
+     iPhone 若也加高，內層 layout viewport 會比畫面高，所有 vh／fixed 舞台會共用錯誤中心。 */
   html.ios-device:not(.iphone-device){
     --app-overscan-guard:16px
   }
   html.ios-device.iphone-device{
+    --app-bottom-inset:0px;
     --app-overscan-guard:0px
   }
-  html.ios-device.ios-standalone,
-  html.ios-device:fullscreen,
-  html.ios-device:-webkit-full-screen{
+  html.ios-device:not(.iphone-device).ios-standalone,
+  html.ios-device:not(.iphone-device):fullscreen,
+  html.ios-device:not(.iphone-device):-webkit-full-screen{
     --app-bottom-inset:max(env(safe-area-inset-bottom,0px),20px)
   }
   @media (pointer: coarse){
@@ -120,6 +122,10 @@
       transform:scale(var(--app-scale));
       transform-origin:0 0;
     }
+    /* iOS WebKit 對「absolute + transformed 跨網域 iframe」裡的 fixed 元件會套錯可視中心。
+       iPhone 回到精品啟動前已穩定的一般排版；bootStage 仍以 z-index 疊在上方，不受影響。
+       iPad 不可套這條，否則會破壞已確認無底線的合成基準。 */
+    html.iphone-device iframe{position:static;top:auto;left:auto}
   }
   #iphoneFullscreenBtn{display:none;position:fixed;right:max(env(safe-area-inset-right,0px),12px);
     bottom:max(env(safe-area-inset-bottom,0px),12px);z-index:2147483647;height:40px;padding:0 14px;
