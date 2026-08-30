@@ -44,7 +44,7 @@
     overflow:hidden;box-sizing:border-box;padding:24px;
     font-family:"LINE Seed TW","Microsoft JhengHei","PingFang TC",sans-serif;
     opacity:1;visibility:visible;
-    transition:opacity .28s ease,visibility 0s linear .28s
+    transition:opacity .55s cubic-bezier(.4,0,.2,1),visibility 0s linear .55s
   }
   #bootStage::before,#bootStage::after{
     content:"";position:absolute;border-radius:50%;pointer-events:none;filter:blur(58px)
@@ -189,7 +189,7 @@ function revealApp() {
       var stage = document.getElementById('bootStage');
       if (stage) {
         stage.setAttribute('aria-hidden','true');
-        setTimeout(function () { stage.remove(); }, 360);
+        setTimeout(function () { stage.remove(); }, 620);
       }
     });
   });
