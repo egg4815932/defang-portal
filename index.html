@@ -70,7 +70,7 @@
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
     html.boot-brand-ready .boot-lockup{animation:none;opacity:1;transform:translateY(-1.6vh)}
-    #bootStage{transition:none}
+    #bootStage{transition:opacity .4s linear,visibility 0s linear .4s}
   }
 
   /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
@@ -158,10 +158,11 @@
   <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
-/* GAS 內頁送出既有 viewport-ready 握手後才交棒；沒有新增登入 gate 或假進度。
-   8 秒只是錯誤頁保險：即使握手失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
+/* viewport-ready 只負責安全區通道；品牌交棒必須等 iframe 完整 load 再穩定 180ms。
+   8 秒只是錯誤頁保險：即使 load 事件失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
 var appRevealScheduled = false;
 var appRevealFallback = null;
+var appFrameSettleTimer = null;
 var bootBrandTimer = null;
 var bootBrandEarliest = Date.now() + 650;
 function scheduleBootBrandAfterViewportSettles() {
@@ -194,11 +195,13 @@ function revealApp() {
     });
   });
 }
-window.addEventListener('message',function(e){
-  if (!e.data || e.data.defang !== 'viewport-ready') return;
-  if (String(e.origin).indexOf('.google') < 0) return;
-  revealApp();
-});
+var appFrame = document.querySelector('iframe');
+if (appFrame) {
+  appFrame.addEventListener('load',function () {
+    clearTimeout(appFrameSettleTimer);
+    appFrameSettleTimer = setTimeout(revealApp,180);
+  });
+}
 appRevealFallback = setTimeout(revealApp,8000);
 
 /* PWA 殼頁禁止瀏覽器原生 pinch zoom。內層 GAS 另有相同防線；雙層都擋才能避免
