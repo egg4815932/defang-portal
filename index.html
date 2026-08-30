@@ -90,11 +90,7 @@
        iframe 內部 innerWidth 與 clientX 同時都是 1142 那個座標系，內部完全無感。
      ⚠ 只在 pointer:coarse 套用：桌機本來就忽略 viewport meta＝電腦版行為維持不變。
      要調整比例只改 --app-scale 這一個數字。 */
-  :root{
-    --app-scale:.8; --app-bottom-inset:0px; --app-overscan-guard:0px;
-    --app-safe-left:env(safe-area-inset-left,0px);
-    --app-safe-right:env(safe-area-inset-right,0px)
-  }
+  :root{ --app-scale:.8; --app-bottom-inset:0px; --app-overscan-guard:0px }
   /* iOS 主畫面 App／Fullscreen API 會保留底部 home indicator 區。
      跨網域 GAS iframe 必須往這一區 overscan，再由殼頁的 overflow:hidden 裁掉超出部分；
      若反過來縮短 iframe，只會把白邊換成殼頁底色，內容與影片仍然用不到該區。
@@ -103,18 +99,17 @@
   html.ios-device{
     --app-bottom-inset:env(safe-area-inset-bottom,0px)
   }
-  /* iPad 才需要往 home indicator 區 overscan；iPhone 使用精確可見高度。
-     iPhone 若也加高，內層 layout viewport 會比畫面高，所有 vh／fixed 舞台會共用錯誤中心。 */
+  /* iPad 的合成縫需要 16px guard；iPhone 則恢復修 iPad 前已穩定的 4px 取整保險。
+     兩者必須分流，不能再把 iPad 的 16px 套到 iPhone。 */
   html.ios-device:not(.iphone-device){
     --app-overscan-guard:16px
   }
   html.ios-device.iphone-device{
-    --app-bottom-inset:0px;
-    --app-overscan-guard:0px
+    --app-overscan-guard:4px
   }
-  html.ios-device:not(.iphone-device).ios-standalone,
-  html.ios-device:not(.iphone-device):fullscreen,
-  html.ios-device:not(.iphone-device):-webkit-full-screen{
+  html.ios-device.ios-standalone,
+  html.ios-device:fullscreen,
+  html.ios-device:-webkit-full-screen{
     --app-bottom-inset:max(env(safe-area-inset-bottom,0px),20px)
   }
   @media (pointer: coarse){
@@ -255,10 +250,6 @@ function clampViewportInset(value) {
   value = Number(value);
   return Math.min(96, Math.max(0, isFinite(value) ? value : 0));
 }
-function clampViewportOffset(value) {
-  value = Number(value);
-  return Math.min(96, Math.max(-96, isFinite(value) ? value : 0));
-}
 function sendViewportInsets() {
   if (!appViewportTarget) return;
   var frame = document.querySelector('iframe');
@@ -270,16 +261,10 @@ function sendViewportInsets() {
   var landscape = viewportWidth > viewportHeight;
   var right = clampViewportInset((rect.right - viewportWidth) / scale);
   var overscanGuard = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-overscan-guard')) || 0;
-  /* guard 只用來蓋掉 iframe 合成縫；不可回報給內頁，否則按鈕會被多推高一截。 */
-  var bottom = clampViewportInset((rect.bottom - viewportHeight - overscanGuard) / scale);
-  var rootStyle = getComputedStyle(document.documentElement);
-  var safeLeft = parseFloat(rootStyle.getPropertyValue('--app-safe-left')) || 0;
-  var safeRight = parseFloat(rootStyle.getPropertyValue('--app-safe-right')) || 0;
-  /* iPhone 橫向的 Dynamic Island 只在一側時，GAS iframe 的 50% 是「安全矩形中心」，
-     不是實體螢幕中心。把左右安全區差的一半換成內頁座標，讓影片／遮罩／進度條共用真正中心。 */
-  var centerOffsetX = 是iPhone裝置 && landscape
-    ? clampViewportOffset((safeRight - safeLeft) / (2 * scale))
-    : 0;
+  /* iPad 的 16px guard 只蓋合成縫，不回報給內頁；iPhone 恢復修 iPad 前的完整裁切值，
+     讓 GAS 內頁用同一組舊版 body／容器規則扣回真正可見矩形。 */
+  var reportedGuard = 是iPhone裝置 ? 0 : overscanGuard;
+  var bottom = clampViewportInset((rect.bottom - viewportHeight - reportedGuard) / scale);
   /* iPhone 直式只顯示轉向提醒，不使用外殼裁切；清掉上一個橫式留下的 inset，
      避免連續旋轉的中間尺寸把內頁寬高扣到只剩背景。 */
   if (是iPhone裝置 && !landscape) right = bottom = 0;
@@ -288,7 +273,6 @@ function sendViewportInsets() {
       defang: 'viewport-insets',
       right: right,
       bottom: bottom,
-      centerOffsetX: centerOffsetX,
       landscape: landscape,
       viewportWidth: viewportWidth,
       viewportHeight: viewportHeight
