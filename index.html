@@ -152,6 +152,12 @@
     align-items:center;justify-content:center;gap:7px;border:1px solid rgba(255,255,255,.95);border-radius:20px;
     color:#fff;background:rgba(43,126,67,.92);box-shadow:0 5px 16px rgba(30,66,41,.32);
     font:700 14px/1 "Microsoft JhengHei",sans-serif;letter-spacing:1px;-webkit-tap-highlight-color:transparent}
+  /* iPhone 實機會把這顆 outer fixed 鈕的垂直基準誤認成 overscan frame 底（比可見 viewport 多 24px）。
+     把同一組 bottom fallback＋guard 加回定位，讓按鈕仍落在可見 viewport 的安全區內。
+     只修外殼控制鈕；iframe 幾何與 iPad ef6a4ea 合成路徑完全不動。 */
+  html.iphone-device #iphoneFullscreenBtn{
+    bottom:calc(max(env(safe-area-inset-bottom,0px),12px) + var(--app-bottom-inset) + var(--app-overscan-guard))
+  }
   html.iphone-device.ios-standalone.fs-supported:not(.fs-active) #iphoneFullscreenBtn{display:flex}
   /* 一般裝置仍由內層按鈕的 postMessage 順勢進全螢幕，不增加過場。
      只有支援 Fullscreen API 的 iPhone 主畫面 App 顯示一次性按鈕：iOS 不保證跨 iframe
@@ -268,7 +274,7 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
-var PWA_BUILD = '20260831-iphone-viewport-diagnostics';
+var PWA_BUILD = '20260831-iphone-edge-controls';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
@@ -297,6 +303,7 @@ function collectViewportDiagnostics(frame) {
     body:viewportRectSnapshot(document.body),
     wrapper:viewportRectSnapshot(wrapper),
     frame:viewportRectSnapshot(frame),
+    fullscreenButton:viewportRectSnapshot(document.getElementById('iphoneFullscreenBtn')),
     viewportVars:[
       getComputedStyle(document.documentElement).getPropertyValue('--app-scale').trim(),
       getComputedStyle(document.documentElement).getPropertyValue('--app-bottom-inset').trim(),

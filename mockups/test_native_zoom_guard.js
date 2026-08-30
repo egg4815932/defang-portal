@@ -18,10 +18,12 @@ const checks = [
   ['iPhone class 在 style 與 iframe 建立前掛上', earlyIphoneClass >= 0 && earlyIphoneClass < styleStart && earlyIphoneClass < appFrame],
   ['iPhone 縮放移到一般外層容器', /html\.iphone-device #appFrameViewport\{[\s\S]*?transform:scale\(var\(--app-scale\)\);[\s\S]*?transform-origin:0 0;[\s\S]*?\}/.test(html)],
   ['iPhone iframe 本身不再 transform', /html\.iphone-device iframe\{\s*position:static;top:auto;left:auto;width:100%;height:100%;transform:none\s*\}/.test(html)],
+  ['iPhone 完整畫面鈕避開 20px fallback 與 4px guard', /html\.iphone-device #iphoneFullscreenBtn\{\s*bottom:calc\(max\(env\(safe-area-inset-bottom,0px\),12px\) \+ var\(--app-bottom-inset\) \+ var\(--app-overscan-guard\)\)\s*\}/.test(html)],
   ['iframe 已由專用外層容器包住', /<div id="appFrameViewport">\s*<iframe[\s\S]*?<\/iframe>\s*<\/div>/.test(html)],
   ['iPad iframe absolute 合成基準未動', /iframe\{\s*display:block;position:absolute;top:0;left:0;width:100%;height:100%/.test(html)],
   ['iPad guard 不回報、iPhone 回報完整裁切', /var reportedGuard = 是iPhone裝置 \? 0 : overscanGuard;/.test(html)],
   ['裁切值使用裝置分流後的 guard', /rect\.bottom - viewportHeight - reportedGuard/.test(html)],
+  ['診斷包含完整畫面鈕矩形', /fullscreenButton:viewportRectSnapshot\(document\.getElementById\('iphoneFullscreenBtn'\)\)/.test(html)],
   ['已移除無效的安全區中心偏移', !['centerOffsetX', '--shell-center-x', '--app-safe-left', '--app-safe-right'].some(marker => html.includes(marker))]
 ];
 
