@@ -66,14 +66,14 @@
 
   iframe{
     display:block;position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;border:0;background:#F6F9F6;
-    opacity:0;pointer-events:none;transition:opacity .28s ease
+    visibility:hidden;pointer-events:none
   }
-  html.app-ready iframe{opacity:1;pointer-events:auto}
+  html.app-ready iframe{visibility:visible;pointer-events:auto}
   html.app-ready #bootStage{opacity:0;visibility:hidden}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
     .boot-lockup{animation:none}
-    #bootStage,iframe{transition:none}
+    #bootStage{transition:none}
   }
 
   /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
