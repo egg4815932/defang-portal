@@ -51,8 +51,9 @@
   }
   #bootStage::before{width:min(430px,54vw);height:min(430px,54vw);top:-24%;right:-9%;background:rgba(177,219,185,.19)}
   #bootStage::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
-  .boot-lockup{position:relative;display:grid;justify-items:center;transform:translateY(-1.6vh);
-    animation:boot-arrive .58s cubic-bezier(.22,.78,.28,1) both}
+  .boot-lockup{position:relative;display:grid;justify-items:center;
+    opacity:0;transform:translateY(calc(-1.6vh + 9px))}
+  html.boot-brand-ready .boot-lockup{animation:boot-arrive .58s cubic-bezier(.22,.78,.28,1) both}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
@@ -68,7 +69,7 @@
   html.app-ready #bootStage{opacity:0;visibility:hidden}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
-    .boot-lockup{animation:none}
+    html.boot-brand-ready .boot-lockup{animation:none;opacity:1;transform:translateY(-1.6vh)}
     #bootStage{transition:none}
   }
 
@@ -161,6 +162,23 @@
    8 秒只是錯誤頁保險：即使握手失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
 var appRevealScheduled = false;
 var appRevealFallback = null;
+var bootBrandTimer = null;
+var bootBrandEarliest = Date.now() + 650;
+function scheduleBootBrandAfterViewportSettles() {
+  clearTimeout(bootBrandTimer);
+  if (document.documentElement.classList.contains('app-ready')) return;
+  bootBrandTimer = setTimeout(function () {
+    if (document.documentElement.classList.contains('app-ready')) return;
+    if (!document.getElementById('bootStage')) return;
+    document.documentElement.classList.add('boot-brand-ready');
+  }, Math.max(180,bootBrandEarliest - Date.now()));
+}
+scheduleBootBrandAfterViewportSettles();
+window.addEventListener('resize',scheduleBootBrandAfterViewportSettles);
+window.addEventListener('orientationchange',scheduleBootBrandAfterViewportSettles);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize',scheduleBootBrandAfterViewportSettles);
+}
 function revealApp() {
   if (appRevealScheduled || document.documentElement.classList.contains('app-ready')) return;
   appRevealScheduled = true;
