@@ -16,8 +16,8 @@
      ・Android 只認 manifest 的 display / orientation
      兩邊都要寫，才會兩邊都全螢幕。
      ⚠ 改了這些之後，舊的主畫面圖示不會自動升級 —— 必須先刪掉、重新加一次。 -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2B7E43">
+<link rel="manifest" href="manifest.json?v=20260830-soft">
+<meta name="theme-color" content="#F6F9F6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="德芳查詢">
@@ -25,14 +25,14 @@
 <link rel="icon" href="icon-192.png">
 
 <style>
-  /* 底色從白色改成品牌漸層：全螢幕時 iframe 以外露出的部分才不會是刺眼的白（深色模式下是黑） */
+  /* 系統與 iframe 交接期間只露出柔白薄荷底，不加遮罩、假進度或等待動畫。 */
   html,body{margin:0;height:100%;
-    background-color:#CDEBD5;
-    background-image:linear-gradient(165deg,#F0FAF2 0%,#DFF2E3 55%,#CDEBD5 100%);
-    touch-action:pan-x pan-y}
+    background-color:#F6F9F6;
+    background-image:linear-gradient(155deg,#FAFCFA 0%,#F4F8F4 58%,#EDF4EE 100%);
+    overflow:hidden;touch-action:pan-x pan-y}
   /* dvh 才抓得到「當下真正看得到的高度」——手機網址列收放時視窗高度是會變的 */
   @supports (height:100dvh){ html,body{height:100dvh} }
-  iframe{display:block;width:100%;height:100%;border:0;background:#CDEBD5}
+  iframe{display:block;position:absolute;top:0;left:0;width:100%;height:100%;border:0;background:#F6F9F6}
 
   /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
      ⛔ 為什麼不能用 <meta viewport initial-scale=0.8>：
@@ -76,8 +76,6 @@
       transform-origin:0 0;
     }
   }
-  .fallback{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    font-family:"Microsoft JhengHei",sans-serif;color:#0aa25a;font-size:18px;z-index:-1}
   #iphoneFullscreenBtn{display:none;position:fixed;right:max(env(safe-area-inset-right,0px),12px);
     bottom:max(env(safe-area-inset-bottom,0px),12px);z-index:2147483647;height:40px;padding:0 14px;
     align-items:center;justify-content:center;gap:7px;border:1px solid rgba(255,255,255,.95);border-radius:20px;
@@ -95,7 +93,6 @@
 </style>
 </head>
 <body>
-  <div class="fallback">德芳連鎖藥局 內部查詢系統載入中…</div>
   <!-- ⚠ 權限是「逐層委派」的：外層沒給，內層那個 googleusercontent 沙盒 iframe 就拿不到。
          geolocation 當初就是漏了它而讓 GPS 簽到必定失敗。vibrate 是為了自製鍵盤的按鍵震動先補上
          （目前 Chrome 未必把它列為 permission policy，是不認就忽略的保險，加了無害）。
