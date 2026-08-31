@@ -50,19 +50,23 @@
   /* 精品啟動舞台：由外殼暫時疊在 iframe 上方，交棒後整個移除；不是 fixed，也不修改 iframe 合成狀態。 */
   #bootStage{
     position:absolute;z-index:2;inset:0;display:grid;place-items:center;
-    overflow:hidden;box-sizing:border-box;padding:24px;
+    overflow:visible;box-sizing:border-box;padding:24px;
     font-family:"LINE Seed TW","Microsoft JhengHei","PingFang TC",sans-serif;
+    visibility:visible;transition:visibility 0s linear 1s
+  }
+  .boot-backdrop{
+    position:absolute;z-index:0;top:0;left:0;width:100%;
+    height:calc(100% + var(--app-bottom-inset) + var(--app-overscan-guard));overflow:hidden;
     background-color:#F6F9F6;
     background-image:linear-gradient(155deg,#FAFCFA 0%,#F4F8F4 58%,#EDF4EE 100%);
-    opacity:1;visibility:visible;
-    transition:opacity .5s cubic-bezier(.4,0,.2,1) .5s,visibility 0s linear 1s
+    opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1) .5s
   }
-  #bootStage::before,#bootStage::after{
+  .boot-backdrop::before,.boot-backdrop::after{
     content:"";position:absolute;border-radius:50%;pointer-events:none;filter:blur(58px)
   }
-  #bootStage::before{width:min(430px,54vw);height:min(430px,54vw);top:-24%;right:-9%;background:rgba(177,219,185,.19)}
-  #bootStage::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
-  .boot-lockup{position:relative;display:grid;justify-items:center;transform:translateY(-1.6vh);
+  .boot-backdrop::before{width:min(430px,54vw);height:min(430px,54vw);top:-24%;right:-9%;background:rgba(177,219,185,.19)}
+  .boot-backdrop::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
+  .boot-lockup{position:relative;z-index:1;display:grid;justify-items:center;transform:translateY(-1.6vh);
     opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1)}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     opacity:0;filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
@@ -92,16 +96,18 @@
   }
   /* iPad／桌機不建立額外盒子，iframe 仍維持 ef6a4ea 的直接合成基準。 */
   #appFrameViewport{display:contents}
-  html.app-ready #bootStage{opacity:0;visibility:hidden}
+  html.app-ready #bootStage{visibility:hidden}
   /* 先讓 Logo／中線／文字淡完，再由獨立薄荷背景於後半秒淡出。 */
   html.app-ready .boot-lockup{opacity:0}
+  html.app-ready .boot-backdrop{opacity:0}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
     html.boot-brand-ready .boot-logo,
     html.boot-brand-ready .boot-rule,
     html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
     .boot-lockup{transition:none}
-    #bootStage{transition:opacity .5s linear,visibility 0s linear .5s}
+    #bootStage{transition:visibility 0s linear .5s}
+    .boot-backdrop{transition:opacity .5s linear}
   }
 
   /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
@@ -201,6 +207,7 @@
 </head>
 <body>
   <main id="bootStage" role="status" aria-label="德芳連鎖藥局內部查詢系統啟動中">
+    <div class="boot-backdrop" aria-hidden="true"></div>
     <div class="boot-lockup">
       <img class="boot-logo" src="logo-brand.png" width="827" height="105" decoding="async" alt="德芳連鎖藥局">
       <div class="boot-rule" aria-hidden="true"></div>
@@ -325,7 +332,7 @@ var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
 var iPhoneSafeAreaProbe = null;
-var PWA_BUILD = '20260901-startup-backdrop-handoff';
+var PWA_BUILD = '20260901-startup-backdrop-overscan';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
