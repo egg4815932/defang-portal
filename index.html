@@ -60,16 +60,28 @@
   }
   #bootStage::before{width:min(430px,54vw);height:min(430px,54vw);top:-24%;right:-9%;background:rgba(177,219,185,.19)}
   #bootStage::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
-  .boot-lockup{position:relative;display:grid;justify-items:center;
-    opacity:0;transform:translateY(calc(-1.6vh + 9px))}
-  html.boot-brand-ready .boot-lockup{animation:boot-arrive .58s cubic-bezier(.22,.78,.28,1) both}
+  .boot-lockup{position:relative;display:grid;justify-items:center;transform:translateY(-1.6vh)}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
-    filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
-  .boot-rule{width:46px;height:1px;margin:24px 0 17px;background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
-  .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em}
-  @keyframes boot-arrive{
-    from{opacity:0;transform:translateY(calc(-1.6vh + 9px))}
-    to{opacity:1;transform:translateY(-1.6vh)}
+    opacity:0;filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
+  .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
+    background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
+  .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
+  /* 精品三拍：Logo → 中線微光 → 系統名稱舒展。 */
+  html.boot-brand-ready .boot-logo{animation:boot-logo-arrive 1s cubic-bezier(.22,.78,.28,1) both}
+  html.boot-brand-ready .boot-rule{animation:boot-rule-glow .6s cubic-bezier(.22,.78,.28,1) .9s both}
+  html.boot-brand-ready .boot-name{animation:boot-name-settle .78s cubic-bezier(.2,.72,.2,1) 1.42s both}
+  @keyframes boot-logo-arrive{
+    from{opacity:0;transform:translateY(9px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  @keyframes boot-rule-glow{
+    from{opacity:0;transform:scaleX(.08);filter:drop-shadow(0 0 0 rgba(43,126,67,0))}
+    70%{opacity:1;transform:scaleX(1.12);filter:drop-shadow(0 0 5px rgba(43,126,67,.22))}
+    to{opacity:1;transform:scaleX(1);filter:drop-shadow(0 0 0 rgba(43,126,67,0))}
+  }
+  @keyframes boot-name-settle{
+    from{opacity:0;letter-spacing:.24em;text-indent:.24em;transform:translateY(6px)}
+    to{opacity:1;letter-spacing:.42em;text-indent:.42em;transform:translateY(0)}
   }
 
   iframe{
@@ -80,7 +92,9 @@
   html.app-ready #bootStage{opacity:0;visibility:hidden}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
-    html.boot-brand-ready .boot-lockup{animation:none;opacity:1;transform:translateY(-1.6vh)}
+    html.boot-brand-ready .boot-logo,
+    html.boot-brand-ready .boot-rule,
+    html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
     #bootStage{transition:opacity .6s linear,visibility 0s linear .6s}
   }
 
@@ -215,14 +229,23 @@ var appFrameSettleTimer = null;
 var appFrameLoaded = false;
 var appRouteSettled = false;
 var bootBrandTimer = null;
+var bootSequenceTimer = null;
+var bootSequenceSettled = false;
+var bootMotionReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var bootBrandEarliest = Date.now() + 650;
 function scheduleBootBrandAfterViewportSettles() {
   clearTimeout(bootBrandTimer);
-  if (document.documentElement.classList.contains('app-ready')) return;
+  if (document.documentElement.classList.contains('app-ready') ||
+      document.documentElement.classList.contains('boot-brand-ready')) return;
   bootBrandTimer = setTimeout(function () {
     if (document.documentElement.classList.contains('app-ready')) return;
     if (!document.getElementById('bootStage')) return;
     document.documentElement.classList.add('boot-brand-ready');
+    clearTimeout(bootSequenceTimer);
+    bootSequenceTimer = setTimeout(function () {
+      bootSequenceSettled = true;
+      scheduleAppRevealAfterRouteSettles();
+    }, bootMotionReduced ? 0 : 2200);
   }, Math.max(180,bootBrandEarliest - Date.now()));
 }
 scheduleBootBrandAfterViewportSettles();
@@ -248,7 +271,7 @@ function revealApp() {
 }
 function scheduleAppRevealAfterRouteSettles() {
   clearTimeout(appFrameSettleTimer);
-  if (!appFrameLoaded || !appRouteSettled) return;
+  if (!appFrameLoaded || !appRouteSettled || !bootSequenceSettled) return;
   appFrameSettleTimer = setTimeout(revealApp,180);
 }
 var appFrame = document.querySelector('iframe');
@@ -295,7 +318,7 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
-var PWA_BUILD = '20260901-iphone-video-native';
+var PWA_BUILD = '20260901-boutique-three-beat';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
