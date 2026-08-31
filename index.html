@@ -196,11 +196,14 @@
   <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
-/* viewport-ready 只負責安全區通道；品牌交棒必須等 iframe 完整 load 再穩定 180ms。
-   8 秒只是錯誤頁保險：即使 load 事件失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
+/* viewport-ready 只負責安全區通道；品牌交棒必須同時等：
+   ① iframe 完整 load；② GAS 完成登入憑證分流，再穩定 180ms。
+   8 秒仍是錯誤頁保險：即使握手失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
 var appRevealScheduled = false;
 var appRevealFallback = null;
 var appFrameSettleTimer = null;
+var appFrameLoaded = false;
+var appRouteSettled = false;
 var bootBrandTimer = null;
 var bootBrandEarliest = Date.now() + 650;
 function scheduleBootBrandAfterViewportSettles() {
@@ -233,11 +236,16 @@ function revealApp() {
     });
   });
 }
+function scheduleAppRevealAfterRouteSettles() {
+  clearTimeout(appFrameSettleTimer);
+  if (!appFrameLoaded || !appRouteSettled) return;
+  appFrameSettleTimer = setTimeout(revealApp,180);
+}
 var appFrame = document.querySelector('iframe');
 if (appFrame) {
   appFrame.addEventListener('load',function () {
-    clearTimeout(appFrameSettleTimer);
-    appFrameSettleTimer = setTimeout(revealApp,180);
+    appFrameLoaded = true;
+    scheduleAppRevealAfterRouteSettles();
   });
 }
 appRevealFallback = setTimeout(revealApp,8000);
@@ -274,7 +282,7 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
-var PWA_BUILD = '20260831-iphone-edge-controls';
+var PWA_BUILD = '20260901-startup-route-handoff';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
@@ -353,6 +361,16 @@ window.addEventListener('message', function (e) {
   appViewportTarget = e.source;
   appViewportOrigin = e.origin;
   scheduleViewportInsets(0);
+});
+
+/* GAS 只有在「有效登入→APP」或「無有效登入→使用條款」確定後才送出。
+   Logo 因此不會先交棒給條款頁，再於伺服器驗證成功後突然跳進 APP。 */
+window.addEventListener('message', function (e) {
+  if (!e.data || e.data.defang !== 'startup-route-settled') return;
+  if (String(e.origin).indexOf('.google') < 0) return;
+  if (e.source !== appViewportTarget || e.origin !== appViewportOrigin) return;
+  appRouteSettled = true;
+  scheduleAppRevealAfterRouteSettles();
 });
 
 /* GAS 內容位在 Google 的跨網域 sandbox iframe；手機鎖屏時 WebView 可能只重建內層 iframe。
