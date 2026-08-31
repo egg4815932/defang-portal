@@ -146,6 +146,16 @@
     html.iphone-device iframe{
       position:static;top:auto;left:auto;width:100%;height:100%;transform:none
     }
+    /* iPhone 的 YouTube 像素會進入 iOS 原生媒體合成層。播放期間把最後一層外殼 scale
+       一併拿掉，以 1:1 layout 維持完全相同的實體尺寸，避免左側 Dynamic Island 安全區
+       在 transformed browsing context 內被平台影片層重複套用。只由 GAS 影片生命週期切換；
+       iPad 不會有 iphone-device，因此 ef6a4ea 的 iframe 合成基準完全不受影響。 */
+    html.iphone-device.iphone-video-native{--app-scale:1}
+    html.iphone-device.iphone-video-native #appFrameViewport{
+      width:100%;
+      height:calc(100% + var(--app-bottom-inset) + var(--app-overscan-guard));
+      transform:none
+    }
   }
   #iphoneFullscreenBtn{display:none;position:fixed;right:max(env(safe-area-inset-right,0px),12px);
     bottom:max(env(safe-area-inset-bottom,0px),12px);z-index:2147483647;height:40px;padding:0 14px;
@@ -244,6 +254,9 @@ function scheduleAppRevealAfterRouteSettles() {
 var appFrame = document.querySelector('iframe');
 if (appFrame) {
   appFrame.addEventListener('load',function () {
+    /* 內層 reload 代表舊播放器已消失；不可讓上一次影片模式的 scale:1 留在外殼。 */
+    document.documentElement.classList.remove('iphone-video-native');
+    scheduleViewportInsets(0);
     appFrameLoaded = true;
     scheduleAppRevealAfterRouteSettles();
   });
@@ -282,7 +295,7 @@ if (是iPhone裝置) {
 var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
-var PWA_BUILD = '20260901-startup-route-handoff';
+var PWA_BUILD = '20260901-iphone-video-native';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
@@ -319,6 +332,7 @@ function collectViewportDiagnostics(frame) {
     ],
     wrapperTransform:wrapper ? getComputedStyle(wrapper).transform : '',
     frameTransform:getComputedStyle(frame).transform,
+    videoNative:document.documentElement.classList.contains('iphone-video-native'),
     sw:navigator.serviceWorker && navigator.serviceWorker.controller ? navigator.serviceWorker.controller.scriptURL : 'none'
   };
 }
@@ -361,6 +375,28 @@ window.addEventListener('message', function (e) {
   appViewportTarget = e.source;
   appViewportOrigin = e.origin;
   scheduleViewportInsets(0);
+});
+
+/* iPhone 播放影片時，先移除包住 GAS／YouTube 的最後一層 transform，再允許 YouTube 開播。
+   同一個已握手的 GAS frame 才能切換；雙 rAF 讓新 layout 與 clip 回報都先落地，ACK 最後送。 */
+window.addEventListener('message', function (e) {
+  if (!e.data || e.data.defang !== 'iphone-video-native') return;
+  if (!是iPhone裝置 || e.source !== appViewportTarget || e.origin !== appViewportOrigin) return;
+  var source = e.source;
+  var origin = e.origin;
+  var active = e.data.active === true;
+  var seq = Number(e.data.seq) || 0;
+  document.documentElement.classList.toggle('iphone-video-native', active);
+  requestAnimationFrame(function () {
+    var wrapper = document.getElementById('appFrameViewport');
+    if (wrapper) wrapper.getBoundingClientRect();
+    sendViewportInsets();
+    requestAnimationFrame(function () {
+      try {
+        source.postMessage({ defang:'iphone-video-native-ready', active:active, seq:seq }, origin);
+      } catch (err) {}
+    });
+  });
 });
 
 /* GAS 只有在「有效登入→APP」或「無有效登入→使用條款」確定後才送出。
