@@ -52,8 +52,10 @@
     position:absolute;z-index:2;inset:0;display:grid;place-items:center;
     overflow:hidden;box-sizing:border-box;padding:24px;
     font-family:"LINE Seed TW","Microsoft JhengHei","PingFang TC",sans-serif;
+    background-color:#F6F9F6;
+    background-image:linear-gradient(155deg,#FAFCFA 0%,#F4F8F4 58%,#EDF4EE 100%);
     opacity:1;visibility:visible;
-    transition:opacity 1s cubic-bezier(.4,0,.2,1),visibility 0s linear 1s
+    transition:opacity .5s cubic-bezier(.4,0,.2,1) .5s,visibility 0s linear 1s
   }
   #bootStage::before,#bootStage::after{
     content:"";position:absolute;border-radius:50%;pointer-events:none;filter:blur(58px)
@@ -61,7 +63,7 @@
   #bootStage::before{width:min(430px,54vw);height:min(430px,54vw);top:-24%;right:-9%;background:rgba(177,219,185,.19)}
   #bootStage::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
   .boot-lockup{position:relative;display:grid;justify-items:center;transform:translateY(-1.6vh);
-    opacity:1;transition:opacity .45s cubic-bezier(.4,0,.2,1)}
+    opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1)}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     opacity:0;filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
@@ -91,15 +93,15 @@
   /* iPad／桌機不建立額外盒子，iframe 仍維持 ef6a4ea 的直接合成基準。 */
   #appFrameViewport{display:contents}
   html.app-ready #bootStage{opacity:0;visibility:hidden}
-  /* 使用條款底下也有一組品牌 Logo；先讓啟動 Logo 較快退場，避免兩顆 Logo 疊影造成突兀跳切。 */
-  html.agreement-handoff .boot-lockup{opacity:0}
+  /* 先讓 Logo／中線／文字淡完，再由獨立薄荷背景於後半秒淡出。 */
+  html.app-ready .boot-lockup{opacity:0}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
     html.boot-brand-ready .boot-logo,
     html.boot-brand-ready .boot-rule,
     html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
-    #bootStage{transition:opacity 1s linear,visibility 0s linear 1s}
     .boot-lockup{transition:none}
+    #bootStage{transition:opacity .5s linear,visibility 0s linear .5s}
   }
 
   /* ========== 手機顯示 80%（2026-08-03 改用 CSS，不再用 initial-scale）==========
@@ -232,7 +234,6 @@ var appRevealFallback = null;
 var appFrameSettleTimer = null;
 var appFrameLoaded = false;
 var appRouteSettled = false;
-var appStartupRoute = '';
 var bootBrandTimer = null;
 var bootSequenceTimer = null;
 var bootSequenceSettled = false;
@@ -265,7 +266,6 @@ function revealApp() {
   clearTimeout(appRevealFallback);
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
-      document.documentElement.classList.toggle('agreement-handoff', appStartupRoute === 'agreement');
       document.documentElement.classList.add('app-ready');
       var stage = document.getElementById('bootStage');
       if (stage) {
@@ -325,7 +325,7 @@ var appViewportTarget = null;
 var appViewportOrigin = '';
 var appViewportSyncTimer = null;
 var iPhoneSafeAreaProbe = null;
-var PWA_BUILD = '20260901-agreement-crossfade-video-origin';
+var PWA_BUILD = '20260901-startup-backdrop-handoff';
 var LOGIN_SESSION_KEY = 'defang.login.session.v1';
 document.documentElement.setAttribute('data-pwa-build',PWA_BUILD);
 function clampViewportInset(value) {
@@ -467,7 +467,6 @@ window.addEventListener('message', function (e) {
   if (!e.data || e.data.defang !== 'startup-route-settled') return;
   if (String(e.origin).indexOf('.google') < 0) return;
   if (e.source !== appViewportTarget || e.origin !== appViewportOrigin) return;
-  appStartupRoute = e.data.record && e.data.record.route === 'agreement' ? 'agreement' : 'app';
   appRouteSettled = true;
   scheduleAppRevealAfterRouteSettles();
 });
