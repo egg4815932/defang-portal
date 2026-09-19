@@ -1,0 +1,9 @@
+/* 畫面在主系統內，共用 sidebarToggle／sidebar，不新增第二套選單。 */
+:host{z-index:99990;text-align:left;transition:padding-left .28s cubic-bezier(.2,.8,.2,1);padding-left:var(--ai-sidebar-space,0px);background:linear-gradient(180deg,#f4fbf5,#eef8f0 45%,#f7fcf8)}
+.page{background:transparent;padding-top:58px}
+.page>header{min-height:48px;position:absolute;top:0;left:var(--ai-sidebar-space,0px);right:0;width:auto;max-width:none;padding:0 18px 0 var(--ai-heading-space,118px);background:rgba(255,255,255,.82);border-bottom:1px solid rgba(43,126,67,.18);transition:left .28s cubic-bezier(.2,.8,.2,1),padding-left .28s cubic-bezier(.2,.8,.2,1)}
+.page>header h1{font-size:16px;letter-spacing:1px;margin:0;white-space:nowrap;outline:none}
+.page>header .sub{display:none}
+.page>header [data-close]{display:none}
+.scenario-page>header [data-use]{font-size:13px;min-height:36px;padding:5px 10px}
+@media(max-width:650px){.page{padding-top:58px}.page>header{gap:4px;padding-right:10px}.page>header h1{font-size:15px}.model-tag{font-size:10px}.compact header .icon-button{width:40px;min-width:40px}.scenario-page>header{flex-wrap:nowrap}.scenario-page>header>div{min-width:0}.scenario-page>header [data-use]{font-size:12px;padding:4px 6px;white-space:nowrap}}

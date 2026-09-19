@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const assetBase = new URL('.', document.currentScript.src);
+  const embedded = window.DFAIEmbedded;
   const host = document.createElement('div');
   host.id = 'defangAI';
   host.hidden = true;
@@ -15,12 +16,17 @@
   const scenarioCss = document.createElement('link');
   scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-4', assetBase).href;
   shadow.appendChild(scenarioCss);
+  if (embedded) {
+    const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
+    embeddedCss.href = new URL('ai-live-embedded.css?v=20260920-5', assetBase).href; shadow.appendChild(embeddedCss);
+  }
   document.body.appendChild(host);
   let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
   const pending = new Map();
   const views = {};
 
   function post(type, extra) {
+    if (embedded) { if (type === 'ai-live-activity') embedded.activity(); return; }
     if (peer) peer.postMessage(Object.assign({ defang: type, nonce: nonce }, extra || {}), origin);
   }
   function activity() {
@@ -29,6 +35,7 @@
     post('ai-live-activity');
   }
   function ticket(options, type) {
+    if (embedded) return embedded.request(type || 'ai-live-ticket', options);
     return new Promise((resolve, reject) => {
       const id = String(++sequence);
       const timer = setTimeout(() => {
@@ -296,10 +303,11 @@
       current.page.hidden = true;
     }
     current = views[mode]; current.page.hidden = false;
+    if (embedded) embedded.select(mode);
     if (mode === 'tutor') scenarios.edit();
     else current.feedback.devices();
     scenarios.load();
-    current.page.querySelector('[data-close]').focus();
+    if (!embedded) current.page.querySelector('[data-close]').focus();
     activity();
   }
 
@@ -318,6 +326,7 @@
     return false;
   }
   window.addEventListener('message', event => {
+    if (embedded) return;
     const message = event.data;
     if (!message || !trusted(event)) return;
     if (message.defang === 'ai-live-open') {
@@ -343,6 +352,7 @@
     else request.reject(new Error(message.result && message.result.error || '連線未成功'));
   });
   shadow.addEventListener('keydown', event => {
+    if (embedded) { activity(); return; }
     if (current && current.client && (current.settings.element.open || current.compact.open)) { activity(); return; }
     if (event.key === 'Escape') close();
     if (event.key === 'Tab' && current) {
@@ -359,4 +369,8 @@
   window.addEventListener('pagehide', close);
   const app = document.querySelector('#appFrameViewport > iframe');
   if (app) app.addEventListener('load', resetAll);
+  if (embedded) {
+    Object.values(views).forEach(view => { view.page.setAttribute('role', 'region'); view.page.removeAttribute('aria-modal'); });
+    embedded.mount({ open: mode => { host.hidden = false; switchView(mode); }, close, reset: resetAll });
+  }
 })();

@@ -37,9 +37,9 @@
       this.level('output', { level: 0, bands: [] });
     }
     async devices() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      if (!window.DFAIAudioDevices && (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices)) return;
       try {
-        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId);
+        const devices = (await (window.DFAIAudioDevices ? window.DFAIAudioDevices() : navigator.mediaDevices.enumerateDevices())).filter(d => d.kind === 'audioinput' && d.deviceId);
         const selected = this.select.value;
         this.select.replaceChildren(new Option('系統預設麥克風', ''));
         devices.forEach((d, i) => this.select.add(new Option(d.label || '麥克風 ' + (i + 1), d.deviceId)));
