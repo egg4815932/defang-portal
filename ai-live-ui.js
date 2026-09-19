@@ -7,7 +7,7 @@
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = new URL('ai-live.css?v=20260919-1', assetBase).href;
+  css.href = new URL('ai-live.css?v=20260919-3', assetBase).href;
   shadow.appendChild(css);
   document.body.appendChild(host);
   let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
@@ -45,6 +45,11 @@
     view.mute.disabled = !ready;
     view.quick.forEach(button => { button.disabled = !ready; });
     if (view.material) view.material.disabled = active;
+    view.settings.lock(active);
+    clearInterval(view.keepAlive);
+    if (active) view.keepAlive = setInterval(() => {
+      if (view.client.run && view.client.run.ready && !view.muted) activity();
+    }, 15000);
     if (!active) { view.mute.textContent = '靜音'; view.muted = false; }
   }
   function status(view, text, error) {
@@ -52,6 +57,8 @@
     view.status.classList.toggle('error', !!error);
   }
   function append(view, event) {
+    const subtitles = view.sessionSettings ? view.sessionSettings.subtitles : view.settings.get().subtitles;
+    if (subtitles === 'off' || (subtitles !== 'both' && subtitles !== event.role)) return;
     if (!view.lines[event.role]) {
       const empty = view.log.querySelector('.empty');
       if (empty) empty.remove();
@@ -81,14 +88,13 @@
     current = null;
     cancelPending();
     host.hidden = true;
-    Object.values(views).forEach(view => { view.page.hidden = true; });
+    Object.values(views).forEach(view => { view.settings.close(); view.page.hidden = true; });
   }
   function resetAll() {
     close();
     Object.values(views).forEach(view => {
       view.empty();
       if (view.material) { view.material.value = ''; view.page.querySelector('.count').textContent = '0 / 12,000 字'; }
-      view.model.selectedIndex = 0;
       status(view, view.mode === 'tutor' ? '先貼上教材，再開始陪練' : '準備好就按開始對話');
     });
     peer = null; origin = ''; nonce = '';
@@ -108,6 +114,7 @@
       '</p></div></header><div class="model-row"><label for="model-' + mode + '">Gemini 3.8</label>' +
       '<select id="model-' + mode + '"><option value="gemini-3.8-live">一般版（Live）</option>' +
       '<option value="gemini-3.8-live-extended-thinking">Extended Thinking</option></select>' +
+      '<button type="button" data-settings>對話設定</button>' +
       '<span class="note">切換模型後，按開始建立新對話。</span></div><div class="workspace">' +
       (tutor ? '<aside class="material"><h2><label for="material-tutor">這次要練習的教材</label></h2>' +
         '<p class="note">可以貼一段課文、產品說明或工作流程。</p><textarea id="material-tutor" maxlength="12000" placeholder="把教材文字貼在這裡…"></textarea>' +
@@ -128,11 +135,15 @@
       mute: page.querySelector('[data-mute]'), quick: Array.from(page.querySelectorAll('[data-prompt]')),
       lines: {}, version: 0, busy: false, muted: false
     };
+    view.settings = new window.DFAISettings(mode, view.model);
+    page.appendChild(view.settings.element);
+    page.querySelector('[data-settings]').addEventListener('click', () => { view.settings.open(); activity(); });
     function empty() {
       view.lines = {};
       view.log.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">' + (tutor ? '✦' : '◉') +
         '</div><strong>' + (tutor ? '從一段文字，開始練習' : '你說，我聽') +
-        '</strong><p>' + (tutor ? '可以請 AI 解釋，也可以讓 AI 問你。' : '你隨時可以插話，或按靜音暫停收音。') + '</p></div>';
+        '</strong><p>' + (view.settings.get().subtitles === 'off' ? '字幕已關閉，仍可正常語音對話。' :
+          tutor ? '可以請 AI 解釋，也可以讓 AI 問你。' : '用自己的步調說話，也可以按靜音暫停收音。') + '</p></div>';
     }
     view.empty = empty;
     empty();
@@ -142,7 +153,7 @@
       turn: () => { view.lines = {}; },
       ready: info => {
         controls(view, true, true);
-        if (!info.resumed && tutor) view.client.prompt('我已準備好，請先問我要聽講解還是做練習。');
+        if (!info.resumed && tutor) view.client.prompt('我已準備好，請依照設定的教學方式開始。');
       },
       ended: () => controls(view, false, false),
       error: text => status(view, text, true),
@@ -152,7 +163,9 @@
       if (view.busy || current !== view) return;
       const material = view.material ? view.material.value.trim() : '';
       if (tutor && !material) { status(view, '請先貼上教材文字', true); view.material.focus(); return; }
-      const options = { mode: mode, model: view.model.value, material: material };
+      if (!view.settings.valid()) return;
+      view.sessionSettings = view.settings.get();
+      const options = { mode: mode, model: view.model.value, material: material, settings: view.sessionSettings };
       view.version++;
       const version = view.version;
       empty();
@@ -169,6 +182,7 @@
       activity();
     });
     view.model.addEventListener('change', () => {
+      view.settings.save();
       end(view, '已切換模型，按開始建立新對話');
       cancelPending();
       activity();
@@ -233,9 +247,10 @@
     else request.reject(new Error(message.result && message.result.error || '連線未成功'));
   });
   shadow.addEventListener('keydown', event => {
+    if (current && current.settings.element.open) { activity(); return; }
     if (event.key === 'Escape') close();
     if (event.key === 'Tab' && current) {
-      const focusable = Array.from(current.page.querySelectorAll('button,select,textarea')).filter(el => !el.disabled && !el.hidden);
+      const focusable = Array.from(current.page.querySelectorAll('button,select,textarea')).filter(el => !el.disabled && !el.hidden && el.getClientRects().length);
       const first = focusable[0], last = focusable[focusable.length - 1];
       if (event.shiftKey && shadow.activeElement === first) { last.focus(); event.preventDefault(); }
       if (!event.shiftKey && shadow.activeElement === last) { first.focus(); event.preventDefault(); }
