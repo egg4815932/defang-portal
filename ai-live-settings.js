@@ -18,13 +18,14 @@
     ['length', '回答長短', [['brief', '簡短 · 兩三句'], ['balanced', '適中 · 重點加例子'], ['detailed', '詳細 · 分段解釋']]],
     ['thinking', '思考深度', [['LOW', '低'], ['MEDIUM', '中'], ['HIGH', '高']]],
     ['detection', '說話偵測', [['noise-resistant', '抗雜音優先（預設）'], ['sensitive', '輕聲優先 · 較容易觸發']]],
+    ['echo', '回音消除', [['on', '開啟（建議）'], ['off', '關閉 · 麥克風也可能收到喇叭聲']]],
     ['pause', '停頓多久才接話', [['auto', '建議 · 等 1.2 秒'], ['300', '0.3 秒 · 容易在停頓時接話'], ['700', '0.7 秒'], ['1200', '1.2 秒'], ['1800', '1.8 秒 · 多等我一下']]],
     ['interruption', '我說話時打斷 AI', [['on', '開啟 · AI 停下來聽'], ['off', '關閉 · 讓 AI 說完']]],
     ['subtitles', '文字字幕', [['both', '雙方都顯示'], ['user', '只顯示我的話'], ['model', '只顯示 AI 的話'], ['off', '關閉字幕']]],
     ['teaching', '教學方式', [['ask', '先問我要講解或練習'], ['explain', '先講解，再確認理解'], ['quiz', '先出題，回答後講解'], ['hint', '先出題，答錯先給提示']]]
   ];
   const defaults = { voice: 'Kore', language: 'zh-TW', role: 'assistant', tone: 'natural', pace: 'normal',
-    length: 'brief', thinking: 'LOW', pause: 'auto', detection: 'noise-resistant', interruption: 'on', subtitles: 'both', teaching: 'ask', customLanguage: '', accent: '' };
+    length: 'brief', thinking: 'LOW', pause: 'auto', detection: 'noise-resistant', echo: 'on', interruption: 'on', subtitles: 'both', teaching: 'ask', customLanguage: '', accent: '' };
   window.DFAISettings = function (mode, model) {
     const storageKey = 'defang.ai.settings.v1.' + mode;
     const values = Object.assign({}, defaults);

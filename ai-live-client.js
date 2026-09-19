@@ -25,7 +25,7 @@
       this.run = null;
     }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
-    async start(getTicket, deviceId) {
+    async start(getTicket, deviceId, captureSettings) {
       this.stop();
       const run = { ready: false, muted: false, reconnects: 0, testing: !getTicket,
         lastFrame: Date.now(), lastSound: Date.now(), sentAudio: false };
@@ -42,7 +42,7 @@
         // 啟動手勢內喚醒，但不讓尚未取得裝置時的 resume 卡住權限流程。
         run.context.resume().catch(() => {});
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: Object.assign({ channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          audio: Object.assign({ channelCount: 1, echoCancellation: !captureSettings || captureSettings.echo !== 'off', noiseSuppression: true, autoGainControl: true },
             deviceId ? { deviceId: { exact: deviceId } } : {})
         });
         if (!current()) { stream.getTracks().forEach(track => track.stop()); return false; }

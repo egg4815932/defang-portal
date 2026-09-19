@@ -146,7 +146,7 @@
       if (view.busy || current !== view) return;
       view.testing = true;
       controls(view, true, false);
-      await view.client.start(null, view.feedback.select.value);
+      await view.client.start(null, view.feedback.select.value, view.settings.get());
     });
     view.feedback.resume.addEventListener('click', () => view.client.resumeAudio());
     page.appendChild(view.settings.element);
@@ -189,7 +189,7 @@
       empty();
       controls(view, true, false);
       activity();
-      await view.client.start(() => ticket(options), view.feedback.select.value);
+      await view.client.start(() => ticket(options), view.feedback.select.value, view.sessionSettings);
       if (view.version === version && !view.client.run) controls(view, false, false);
     });
     view.stop.addEventListener('click', () => { end(view, '通話已結束；再次開始會建立新對話'); cancelPending(); });
