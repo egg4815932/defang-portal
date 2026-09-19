@@ -22,6 +22,7 @@
         '<svg class="output-wave" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true"><path class="wave-fill"/><path class="wave-line"/></svg></div></div>' +
         '<p class="mic-health" role="status">尚未開啟麥克風</p>';
       this.select = this.element.querySelector('select');
+      this.deviceLabel = this.element.querySelector('.mic-device');
       this.test = this.element.querySelector('[data-test-mic]');
       this.resume = this.element.querySelector('[data-resume]');
       this.bars = Array.from(this.element.querySelectorAll('.input-wave i'));
@@ -46,7 +47,7 @@
       } catch (error) { /* 沒有裝置清單時，仍可透過預設裝置開啟權限。 */ }
     }
     device(info) {
-      this.element.querySelector('.mic-device').textContent = '使用中：' + info.label;
+      this.deviceLabel.textContent = '使用中：' + info.label;
       this.devices();
     }
     lock(active, testing) {

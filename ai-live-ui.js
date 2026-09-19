@@ -9,6 +9,9 @@
   css.rel = 'stylesheet';
   css.href = new URL('ai-live.css?v=20260920-1', assetBase).href;
   shadow.appendChild(css);
+  const compactCss = document.createElement('link');
+  compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260920-2', assetBase).href;
+  shadow.appendChild(compactCss);
   document.body.appendChild(host);
   let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
   const pending = new Map();
@@ -55,9 +58,10 @@
       if (view.client.run && view.client.run.ready && !view.muted) activity();
     }, 15000);
     if (!active) { view.mute.textContent = '靜音'; view.muted = false; }
+    if (view.compact) view.compact.refresh();
   }
   function status(view, text, error) {
-    view.status.textContent = text;
+    view.status.textContent = view.compact ? view.compact.status(text, error) : text;
     view.status.classList.toggle('error', !!error);
   }
   function append(view, event) {
@@ -92,13 +96,14 @@
     current = null;
     cancelPending();
     host.hidden = true;
-    Object.values(views).forEach(view => { view.capture.clear(); view.settings.close(); view.page.hidden = true; });
+    Object.values(views).forEach(view => { view.capture.clear(); view.compact.close(); view.settings.close(); view.page.hidden = true; });
   }
   function resetAll() {
     close();
     Object.values(views).forEach(view => {
       view.empty();
       if (view.material) { view.material.value = ''; view.page.querySelector('.count').textContent = '0 / 12,000 字'; }
+      view.compact.refresh();
       status(view, view.mode === 'tutor' ? '先貼上教材，再開始陪練' : '準備好就按開始對話');
     });
     peer = null; origin = ''; nonce = '';
@@ -170,6 +175,7 @@
     page.querySelector('[data-settings]').addEventListener('click', () => { view.settings.open(); activity(); });
     function empty() {
       view.lines = {};
+      if (view.compact) { view.log.innerHTML = view.compact.empty(); return; }
       view.log.innerHTML = '<div class="empty"><div class="orb" aria-hidden="true">' + (tutor ? '✦' : '◉') +
         '</div><strong>' + (tutor ? '從一段文字，開始練習' : '你說，我聽') +
         '</strong><p>' + (view.settings.get().subtitles === 'off' ? '字幕已關閉，仍可正常語音對話。' :
@@ -197,7 +203,7 @@
     view.start.addEventListener('click', async () => {
       if (view.busy || current !== view) return;
       const material = view.material ? view.material.value.trim() : '';
-      if (tutor && !material) { status(view, '請先貼上教材文字', true); view.material.focus(); return; }
+      if (tutor && !material) { status(view, '請先貼上教材文字', true); view.compact.material(); view.material.focus(); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = view.settings.get();
       const options = { mode: mode, model: view.model.value, material: material, settings: view.sessionSettings };
@@ -217,6 +223,7 @@
       view.client.mute(view.muted);
       view.capture.lock(true, !view.muted && view.client.run && view.client.run.ready);
       view.mute.textContent = view.muted ? '取消靜音' : '靜音';
+      view.compact.refresh();
       activity();
     });
     view.model.addEventListener('change', () => {
@@ -229,7 +236,7 @@
     page.querySelector('[data-close]').addEventListener('click', close);
     view.quick.forEach(button => button.addEventListener('click', () => {
       view.lines = {};
-      append(view, { role: 'user', text: button.textContent });
+      append(view, { role: 'user', text: button.getAttribute('aria-label') || button.textContent });
       view.lines = {};
       view.client.prompt(button.dataset.prompt);
       activity();
@@ -238,6 +245,8 @@
       page.querySelector('.count').textContent = view.material.value.length.toLocaleString() + ' / 12,000 字';
       activity();
     });
+    view.compact = new window.DFAICompact(view);
+    empty(); status(view, view.status.textContent);
     controls(view, false, false);
     return view;
   }
@@ -287,7 +296,7 @@
     else request.reject(new Error(message.result && message.result.error || '連線未成功'));
   });
   shadow.addEventListener('keydown', event => {
-    if (current && current.settings.element.open) { activity(); return; }
+    if (current && (current.settings.element.open || current.compact.open)) { activity(); return; }
     if (event.key === 'Escape') close();
     if (event.key === 'Tab' && current) {
       const focusable = Array.from(current.page.querySelectorAll('button,select,textarea,summary,audio[controls]')).filter(el => !el.disabled && !el.hidden && el.getClientRects().length);

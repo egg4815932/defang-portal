@@ -1,0 +1,54 @@
+/* 既有字型／綠藍色系；工具收進面板，保留主畫面的對話空間。 */
+.compact{padding:16px max(20px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));gap:12px}
+.compact>header,.compact>.workspace,.compact>footer{width:100%;max-width:1200px;margin:0 auto}
+.compact header{gap:10px;min-height:48px}
+.compact h1{font-size:21px;letter-spacing:.02em;margin:0;white-space:nowrap}
+.model-tag{display:block;color:#73937c;font-size:11px;letter-spacing:.03em;line-height:1.4}
+.ui-icon{display:block;width:24px;height:24px;flex-shrink:0}
+.icon-button{display:inline-grid;place-items:center;flex-shrink:0;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:50%;position:relative}
+.compact header .icon-button{border-color:transparent;background:transparent}
+.compact header .icon-button:hover{background:#dfefe4}
+.icon-button.warning::after,.icon-button.recording::after,.icon-button.has-material::after{content:"";position:absolute;right:5px;top:4px;width:7px;height:7px;border-radius:50%;background:#cd8428;box-shadow:0 0 0 2px #f6f9f6}
+.icon-button.recording::after{background:#c84b45}.icon-button.has-material::after{background:#2b7e43}
+.compact .workspace{gap:0}
+.compact .conversation{border-radius:22px;background:#ffffffb8}
+.compact .transcript{padding:26px clamp(16px,4vw,52px);scrollbar-width:thin}
+.compact .bubble{max-width:min(82%,800px);width:fit-content;padding:12px 18px;margin-bottom:18px;line-height:1.8;background:#eff6f1;border-radius:18px 18px 18px 5px}
+.compact .bubble[data-role=user]{background:#d8efdf;border-radius:18px 18px 5px 18px}
+.compact .bubble b,.compact .meter-head b,.compact .meter-head span,.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.compact .empty{min-height:0}.compact .empty .ui-icon{width:54px;height:54px;color:#b0d6bc;stroke-width:1.1}
+.compact .audio-feedback{padding:10px 16px;border-top:1px solid #e3eee6;border-bottom:0;background:#f8fcf9}
+.compact .audio-meters{gap:10px;max-width:680px;margin:0 auto}
+.compact .meter{display:flex;align-items:center;gap:10px;min-height:50px;padding:4px 12px;border-radius:14px;border:0;box-shadow:none}
+.compact .meter-head{position:relative;display:flex;flex-direction:row;flex-shrink:0;color:#47875b}
+.compact .meter-ai .meter-head{color:#397eb4}
+.compact .meter-head .ui-icon{width:20px;height:20px}
+.compact .input-wave,.compact .output-wave{flex:1;min-width:0;height:38px}
+.compact .input-wave{gap:3px}.compact .input-wave i{max-height:36px;max-width:7px}
+.compact footer{flex-direction:column;gap:8px}
+.compact .status-wrap{flex:none;text-align:center;max-width:100%}
+.compact .status{font-size:12px;font-weight:400;color:#72907b;min-height:19px}
+.compact .status::before{content:"";display:inline-block;width:6px;height:6px;margin-right:7px;vertical-align:middle;background:#aabbb0;border-radius:50%}
+.compact.is-active .status::before{background:#36a35b}.compact .status.error{color:#a43a32}.compact .status.error::before{background:#a43a32}
+.compact .controls{justify-content:center;align-items:center;gap:12px;width:auto}
+.compact .controls>.primary,.compact .controls>.stop{width:60px;height:60px;min-width:60px;border:0;box-shadow:0 5px 16px #285a3320}
+.compact .controls>.primary{background:#2b7e43;color:#fff}.compact .controls>.stop{background:#b65048;color:#fff}
+.hangup .ui-icon{transform:rotate(135deg)}
+.compact .quick{display:flex;padding:0;border:0;gap:8px;flex-wrap:nowrap}.compact .quick .icon-button{padding:0}
+.utility-dialog{width:min(520px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:20px;border:1px solid #c5ddce;border-radius:22px;background:#f6f9f6;color:#1e4229;box-shadow:0 20px 70px #16362244}
+.utility-dialog[open]{display:flex;flex-direction:column;gap:14px}.utility-dialog::backdrop{background:#16362266}
+.utility-content{overflow:auto;min-height:0;overscroll-behavior:contain}
+.utility-dialog .audio-tools{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:0}
+.utility-dialog .audio-tools label{grid-column:1/-1;font-size:13px}
+.utility-dialog .audio-tools select{width:100%;max-width:none;min-width:0;grid-column:1}
+.utility-dialog .mic-device{grid-column:1/-1;font-size:11px}
+.utility-dialog .mic-health{margin:8px 0 14px}
+.utility-dialog .audio-review{max-height:none;min-height:0;overflow:visible;border:0;border-top:1px solid #dce9e1;padding-top:14px;background:transparent}
+.utility-dialog .review-body{padding:0;gap:12px}.utility-dialog .review-buttons button{padding:0}
+.material-panel .material{padding:0;border:0;background:none;min-height:0;gap:8px}
+.material-panel textarea{flex:none;min-height:140px;height:min(45dvh,360px);resize:vertical}
+.compact .model-row{display:flex;gap:12px;margin:0 0 20px;padding:0 4px}.compact .model-row select{flex:1;min-width:0;max-width:100%}
+.settings-help{margin-top:16px;font-size:12px;color:#5c8065}.settings-help summary{cursor:pointer;min-height:32px}.settings-help p{margin:8px 0}
+.compact .settings-head h2{font-size:18px}.compact .settings-storage{font-size:11px}
+@media(max-width:650px){.compact{padding:10px max(10px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:8px}.compact h1{font-size:18px}.compact header{gap:2px}.compact .conversation{border-radius:18px}.compact .transcript{padding:18px 14px}.compact .bubble{max-width:88%;padding:10px 14px;font-size:15px;margin-bottom:14px}.compact .audio-feedback{padding:8px}.compact .meter{padding:3px 9px;gap:6px;min-height:46px}.compact .audio-meters{gap:6px}.compact .controls button{flex:none}.compact .status-wrap{flex-basis:auto}.compact .controls>.primary,.compact .controls>.stop{width:56px;height:56px;min-width:56px}.utility-dialog{padding:16px}.compact .model-row select{flex:1}.compact .empty .ui-icon{width:44px;height:44px}}
+@media(max-height:500px){.compact{gap:6px;padding-top:6px;padding-bottom:8px}.compact header{min-height:44px}.compact .model-tag{display:none}.compact .audio-feedback{padding:4px 12px}.compact .meter{min-height:34px}.compact .input-wave,.compact .output-wave{height:28px}.compact .input-wave i{max-height:26px}.compact footer{flex-direction:row;justify-content:center;gap:16px}.compact .status-wrap{max-width:35%}.compact .controls>.primary,.compact .controls>.stop{width:48px;height:48px;min-width:48px}.compact .status{min-height:0}}

@@ -86,7 +86,7 @@
     function sync() {
       dialog.querySelector('[data-language-check]').hidden = inputs.language.value !== 'zh-TW';
       inputs.thinking.disabled = active || model.value !== 'gemini-3.8-live-extended-thinking';
-      inputs.thinking.parentElement.title = model.value === 'gemini-3.8-live' ? '請先在主畫面切換至 Extended Thinking' : '';
+      inputs.thinking.parentElement.title = model.value === 'gemini-3.8-live' ? '請先選擇 Extended Thinking' : '';
       inputs.customLanguage.parentElement.hidden = inputs.language.value !== 'custom';
       inputs.customLanguage.required = inputs.language.value === 'custom';
       inputs.customLanguage.setCustomValidity(inputs.language.value === 'custom' && !inputs.customLanguage.value.trim() ? '請填寫自訂語言' : '');
@@ -121,7 +121,7 @@
       lock: value => {
         active = value;
         dialog.querySelector('fieldset').disabled = value;
-        dialog.querySelector('[data-settings-note]').textContent = value ? '通話中暫時鎖住設定；請先完成設定視窗，再結束通話後調整。' : '這個介面會記住你的選擇，下次開始對話時生效。';
+        dialog.querySelector('[data-settings-note]').textContent = value ? '通話中 · 結束後可調整' : '自動記住 · 下次通話生效';
         sync();
       }
     };
