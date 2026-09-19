@@ -49,6 +49,7 @@
       '<p class="note" data-settings-note>這個介面會記住你的選擇，下次開始對話時生效。</p>' +
       '<div class="settings-scroll"><fieldset><legend>聲音與對話偏好</legend><div class="settings-grid"></div>' +
       '<p class="note">語言、口音、語氣、語速與教學方式會引導 AI 回應，實際表現可能略有不同。語速不是固定倍速。</p>' +
+      '<p class="note" data-language-check>台灣中文模式會檢查 AI 回覆文字，明顯外語會停播並重答一次；關閉字幕仍會檢查。整段外語練習請改選回應語言。</p>' +
       '<p class="note">思考深度只適用 Extended Thinking；越高可能等越久。接話時間是停頓判定，不是保證的回應速度。</p>' +
       '<button type="button" data-defaults>還原這個介面的預設</button></fieldset></div>' +
       '<p class="note settings-storage" role="status">設定保存在這個瀏覽器；不保存教材與對話。</p>';
@@ -80,6 +81,7 @@
       return settings;
     }
     function sync() {
+      dialog.querySelector('[data-language-check]').hidden = inputs.language.value !== 'zh-TW';
       inputs.thinking.disabled = active || model.value !== 'gemini-3.8-live-extended-thinking';
       inputs.thinking.parentElement.title = model.value === 'gemini-3.8-live' ? '請先在主畫面切換至 Extended Thinking' : '';
       inputs.customLanguage.parentElement.hidden = inputs.language.value !== 'custom';

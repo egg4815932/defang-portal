@@ -2,6 +2,7 @@
 (function (root) {
   'use strict';
   const ENDPOINT = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=';
+  const LanguageGuard = root.DFLanguageGuard || (typeof module !== 'undefined' && module.exports ? require('./ai-live-language.js') : null);
   function encode(buffer) {
     const bytes = new Uint8Array(buffer);
     let text = '';
@@ -110,6 +111,8 @@
         const ticket = await getTicket();
         if (!current()) return false;
         run.ticket = ticket;
+        if (ticket.language === 'zh-TW') run.languageGuard = new LanguageGuard();
+        run.languageRetries = 0;
         run.expiry = setTimeout(() => this.fail(run, '本次通話已滿 30 分鐘，請按開始建立新對話'),
           Math.max(0, ticket.expiresAt - Date.now()));
         this.connect(run, false);
@@ -127,6 +130,7 @@
       if (this.run !== run) return;
       run.ready = false;
       run.sentAudio = false;
+      if (run.languageGuard) run.languageGuard.reset();
       if (run.socket) {
         run.socket.onclose = null;
         run.socket.onmessage = null;
@@ -185,18 +189,35 @@
         this.emit('text', { role: 'user', text: content.inputTranscription.text });
         this.emit('activity');
       }
-      if (content.outputTranscription && content.outputTranscription.text) {
-        this.emit('text', { role: 'model', text: content.outputTranscription.text });
+      const checked = run.languageGuard ? run.languageGuard.consume(content) : {
+        text: content.outputTranscription && content.outputTranscription.text || '',
+        audio: ((content.modelTurn && content.modelTurn.parts) || [])
+          .filter(part => part.inlineData && /^audio\/pcm/.test(part.inlineData.mimeType || '')).map(part => part.inlineData)
+      };
+      if (checked.rejected) { this.clearAudio(run); this.emit('turn'); }
+      if (checked.blocked) {
+        this.emit('state', '回覆語言未通過中文檢查，已停止播放');
+        if (checked.retry) {
+          if (run.languageRetries >= 1) {
+            this.fail(run, 'Gemini 再次未通過中文檢查，已結束通話；請重新開始'); return;
+          }
+          run.languageRetries++;
+          this.send(run, { clientContent: { turns: [{ role: 'user', parts: [{ text:
+            '上一段回覆未通過本系統的中文檢查，使用者沒有要求切換語言。請停止原回覆，只用台灣華語與繁體中文簡短重答最後一個問題；若沒聽清楚，請用中文詢問，勿猜測成其他語言。' }] }], turnComplete: true } });
+          this.emit('state', '已要求 Gemini 用台灣中文重答…');
+        }
+        if (message.goAway && !this.resume(run)) this.fail(run, '本次連線即將結束，請按開始建立新對話');
+        return;
       }
-      for (const part of (content.modelTurn && content.modelTurn.parts) || []) {
-        if (part.inlineData && /^audio\/pcm/.test(part.inlineData.mimeType || '')) this.play(run, part.inlineData);
-      }
+      if (checked.text) this.emit('text', { role: 'model', text: checked.text });
+      checked.audio.forEach(audio => this.play(run, audio));
       const status = message.interactionStatus || content.interactionStatus;
       if (status === 'IN_PROGRESS') this.emit('state', 'AI 正在思考…你仍然可以說話');
       if (status === 'IDLE' || (content.turnComplete && run.ticket.model === 'gemini-3.8-live')) {
         this.emit('state', run.muted ? '麥克風已靜音' : '已連線，可以繼續說話');
       }
       if (content.turnComplete) this.emit('turn');
+      if (checked.waiting) this.emit('state', '正在確認回覆語言…');
       if (message.goAway && !this.resume(run)) this.fail(run, '本次連線即將結束，請按開始建立新對話');
     }
     play(run, data) {
