@@ -194,7 +194,16 @@
   function trusted(event) {
     const frame = document.querySelector('#appFrameViewport > iframe');
     if (!frame || !/^https:\/\/(?:[a-z0-9-]+-)?script\.googleusercontent\.com$/.test(event.origin)) return false;
-    try { return event.source && event.source.parent === frame.contentWindow; } catch (error) { return false; }
+    try {
+      // Google 線上會再包一層同來源 userCodeAppPanel；只接受既有 GAS iframe 的後代。
+      var source = event.source;
+      for (var depth = 0; source && depth < 4; depth++) {
+        if (source === frame.contentWindow) return true;
+        if (source === source.parent) break;
+        source = source.parent;
+      }
+    } catch (error) {}
+    return false;
   }
   window.addEventListener('message', event => {
     const message = event.data;
