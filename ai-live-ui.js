@@ -7,7 +7,7 @@
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = new URL('ai-live.css?v=20260919-3', assetBase).href;
+  css.href = new URL('ai-live.css?v=20260919-4', assetBase).href;
   shadow.appendChild(css);
   document.body.appendChild(host);
   let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
@@ -46,6 +46,9 @@
     view.quick.forEach(button => { button.disabled = !ready; });
     if (view.material) view.material.disabled = active;
     view.settings.lock(active);
+    view.feedback.lock(active, active && view.testing);
+    view.stop.textContent = view.testing ? '結束測試' : '結束通話';
+    view.mute.hidden = !active || view.testing;
     clearInterval(view.keepAlive);
     if (active) view.keepAlive = setInterval(() => {
       if (view.client.run && view.client.run.ready && !view.muted) activity();
@@ -136,6 +139,16 @@
       lines: {}, version: 0, busy: false, muted: false
     };
     view.settings = new window.DFAISettings(mode, view.model);
+    view.feedback = new window.DFAIFeedback(mode);
+    page.querySelector('.conversation').prepend(view.feedback.element);
+    view.feedback.test.addEventListener('click', async () => {
+      if (view.testing && view.busy) { end(view, '麥克風測試已結束'); return; }
+      if (view.busy || current !== view) return;
+      view.testing = true;
+      controls(view, true, false);
+      await view.client.start(null, view.feedback.select.value);
+    });
+    view.feedback.resume.addEventListener('click', () => view.client.resumeAudio());
     page.appendChild(view.settings.element);
     page.querySelector('[data-settings]').addEventListener('click', () => { view.settings.open(); activity(); });
     function empty() {
@@ -157,7 +170,11 @@
       },
       ended: () => controls(view, false, false),
       error: text => status(view, text, true),
-      activity: activity
+      activity: activity,
+      inputLevel: event => view.feedback.level('input', event),
+      outputLevel: event => view.feedback.level('output', event),
+      inputState: state => view.feedback.state(state),
+      device: info => view.feedback.device(info)
     }, new URL('ai-live-processor.js?v=20260919-1', assetBase).href);
     view.start.addEventListener('click', async () => {
       if (view.busy || current !== view) return;
@@ -168,10 +185,11 @@
       const options = { mode: mode, model: view.model.value, material: material, settings: view.sessionSettings };
       view.version++;
       const version = view.version;
+      view.testing = false;
       empty();
       controls(view, true, false);
       activity();
-      await view.client.start(() => ticket(options));
+      await view.client.start(() => ticket(options), view.feedback.select.value);
       if (view.version === version && !view.client.run) controls(view, false, false);
     });
     view.stop.addEventListener('click', () => { end(view, '通話已結束；再次開始會建立新對話'); cancelPending(); });
@@ -229,6 +247,7 @@
       current = views[message.mode];
       host.hidden = false;
       current.page.hidden = false;
+      current.feedback.devices();
       current.page.querySelector('[data-close]').focus();
       post('ai-live-opened');
       return;

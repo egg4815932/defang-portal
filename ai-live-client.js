@@ -24,9 +24,10 @@
       this.run = null;
     }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
-    async start(getTicket) {
+    async start(getTicket, deviceId) {
       this.stop();
-      const run = { sources: new Set(), ready: false, muted: false, nextTime: 0, reconnects: 0 };
+      const run = { sources: new Set(), ready: false, muted: false, nextTime: 0, reconnects: 0, testing: !getTicket,
+        lastFrame: Date.now(), lastSound: Date.now(), sentAudio: false };
       this.run = run;
       const current = () => this.run === run;
       try {
@@ -37,31 +38,74 @@
         const Context = root.AudioContext || root.webkitAudioContext;
         if (!Context) throw new Error('此瀏覽器不支援即時音訊');
         run.context = new Context();
-        await run.context.resume();
-        if (!current()) return false;
+        // 啟動手勢內喚醒，但不讓尚未取得裝置時的 resume 卡住權限流程。
+        run.context.resume().catch(() => {});
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          audio: Object.assign({ channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            deviceId ? { deviceId: { exact: deviceId } } : {})
         });
         if (!current()) { stream.getTracks().forEach(track => track.stop()); return false; }
         run.stream = stream;
+        run.context.resume().catch(() => {});
+        this.emit('device', { label: stream.getAudioTracks()[0].label || '系統預設麥克風',
+          id: stream.getAudioTracks()[0].getSettings ? stream.getAudioTracks()[0].getSettings().deviceId : '' });
         if (!run.context.audioWorklet) throw new Error('此瀏覽器不支援即時收音，請更新 Safari 或 Chrome');
         await run.context.audioWorklet.addModule(this.processorUrl);
         if (!current()) return false;
         run.input = run.context.createMediaStreamSource(stream);
         run.processor = new AudioWorkletNode(run.context, 'defang-pcm');
+        run.processor.onprocessorerror = () => { if (current()) this.fail(run, '收音處理中斷，請重新開始；若仍失敗請更新瀏覽器'); };
         run.processor.port.onmessage = event => {
-          if (!current() || !run.ready || run.muted) return;
+          if (!current()) return;
+          run.lastFrame = Date.now();
+          const samples = new Int16Array(event.data);
+          const bands = new Array(24).fill(0);
+          let power = 0;
+          for (let i = 0; i < samples.length; i++) {
+            const value = samples[i] / 32768;
+            power += value * value;
+            const band = Math.min(23, Math.floor(i * 24 / samples.length));
+            bands[band] = Math.max(bands[band], Math.abs(value));
+          }
+          const level = Math.sqrt(power / (samples.length || 1));
+          if (!run.muted && level > 0.003) run.lastSound = Date.now();
+          if (!run.muted) this.emit('inputLevel', { level: level, bands: bands });
+          if (!run.ready || run.muted || run.testing) return;
           if (run.socket.bufferedAmount > 128000) {
             this.fail(run, '網路太慢，已停止通話；請換穩定的網路再開始');
             return;
           }
-          this.send(run, { realtimeInput: { audio: { data: encode(event.data), mimeType: 'audio/pcm;rate=16000' } } });
+          if (this.send(run, { realtimeInput: { audio: { data: encode(event.data), mimeType: 'audio/pcm;rate=16000' } } })) run.sentAudio = true;
         };
         run.input.connect(run.processor);
         run.processor.connect(run.context.destination);
+        run.output = run.context.createAnalyser();
+        run.output.fftSize = 1024;
+        run.output.connect(run.context.destination);
+        const outputSamples = new Float32Array(run.output.fftSize);
+        run.monitor = setInterval(() => {
+          if (!current()) return;
+          const now = Date.now();
+          const running = run.context.state === 'running';
+          const track = run.stream.getAudioTracks()[0];
+          let inputState = run.muted ? 'muted' : !running ? 'paused' : track.muted ? 'blocked' :
+            now - run.lastFrame > 3000 ? 'stalled' : now - run.lastSound > 8000 ? 'quiet' :
+            run.testing ? 'testing' : run.ready && run.sentAudio ? 'sending' : 'connecting';
+          this.emit('inputState', inputState);
+          run.output.getFloatTimeDomainData(outputSamples);
+          let power = 0;
+          const bands = new Array(24).fill(0);
+          for (let i = 0; i < outputSamples.length; i++) {
+            power += outputSamples[i] * outputSamples[i];
+            const band = Math.min(23, Math.floor(i * 24 / outputSamples.length));
+            bands[band] = Math.max(bands[band], Math.abs(outputSamples[i]));
+          }
+          this.emit('outputLevel', { level: running ? Math.sqrt(power / outputSamples.length) : 0, bands: running ? bands : [] });
+        }, 80);
         stream.getAudioTracks().forEach(track => {
           track.onended = () => { if (current()) this.fail(run, '麥克風已中斷，請重新開始'); };
         });
+        if (run.testing) { this.emit('state', '麥克風測試中，聲音只在這台裝置檢查，不傳送給 Gemini'); return true; }
         this.emit('state', '正在連接 Gemini…');
         const ticket = await getTicket();
         if (!current()) return false;
@@ -73,7 +117,8 @@
       } catch (error) {
         if (!current()) return false;
         const message = error.name === 'NotAllowedError' ? '麥克風未開放，請在瀏覽器允許後重新開始' :
-          error.name === 'NotFoundError' ? '找不到麥克風，請確認裝置已連接' : error.message;
+          error.name === 'NotFoundError' || error.name === 'OverconstrainedError' ? '找不到選擇的麥克風，請改選其他裝置' :
+          error.name === 'NotReadableError' ? '麥克風無法開啟，請檢查系統麥克風權限或其他程式是否占用' : error.message;
         this.fail(run, message || '連線失敗，請稍後再試');
         return false;
       }
@@ -81,6 +126,7 @@
     connect(run, resume) {
       if (this.run !== run) return;
       run.ready = false;
+      run.sentAudio = false;
       if (run.socket) {
         run.socket.onclose = null;
         run.socket.onmessage = null;
@@ -163,7 +209,7 @@
       buffer.copyToChannel(samples, 0);
       const source = run.context.createBufferSource();
       source.buffer = buffer;
-      source.connect(run.context.destination);
+      source.connect(run.output);
       run.sources.add(source);
       source.onended = () => { run.sources.delete(source); source.disconnect(); };
       const when = Math.max(run.context.currentTime + 0.02, run.nextTime);
@@ -171,15 +217,25 @@
       run.nextTime = when + buffer.duration;
     }
     send(run, value) {
-      if (this.run === run && run.ready && run.socket.readyState === 1) run.socket.send(JSON.stringify(value));
+      if (this.run === run && run.ready && run.socket && run.socket.readyState === 1) {
+        run.socket.send(JSON.stringify(value)); return true;
+      }
+      return false;
     }
     prompt(text) { if (this.run) this.send(this.run, { realtimeInput: { text: text } }); }
+    resumeAudio() {
+      const run = this.run;
+      if (!run) return;
+      run.context.resume().catch(() => { if (this.run === run) this.fail(run, '無法恢復音訊，請結束後重新開始'); });
+    }
     mute(value) {
       const run = this.run;
       if (!run) return;
       run.muted = value;
+      run.lastSound = Date.now();
       if (run.stream) run.stream.getAudioTracks().forEach(track => { track.enabled = !value; });
       if (value) this.send(run, { realtimeInput: { audioStreamEnd: true } });
+      if (value) this.emit('inputLevel', { level: 0, bands: [] });
       this.emit('state', value ? '麥克風已靜音' : '已連線，可以繼續說話');
     }
     clearAudio(run) {
@@ -198,14 +254,19 @@
       if (!run) return;
       clearTimeout(run.timeout);
       clearTimeout(run.expiry);
+      clearInterval(run.monitor);
       if (run.socket) {
         run.socket.onclose = null; run.socket.onerror = null; run.socket.onmessage = null;
         run.socket.close();
       }
       if (run.stream) run.stream.getTracks().forEach(track => { track.onended = null; track.stop(); });
-      if (run.processor) { run.processor.port.onmessage = null; run.processor.disconnect(); }
+      if (run.processor) { run.processor.port.onmessage = null; run.processor.onprocessorerror = null; run.processor.disconnect(); }
       if (run.input) run.input.disconnect();
       this.clearAudio(run);
+      if (run.output) run.output.disconnect();
+      this.emit('inputLevel', { level: 0, bands: [] });
+      this.emit('outputLevel', { level: 0, bands: [] });
+      this.emit('inputState', 'idle');
       if (run.context && run.context.state !== 'closed') run.context.close().catch(function () {});
       this.emit('ended');
     }

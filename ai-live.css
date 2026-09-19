@@ -25,6 +25,21 @@ textarea{width:100%;flex:1;min-height:100px;resize:none;padding:14px;background:
 textarea:disabled{opacity:.8}
 .count{text-align:right;font-size:12px}
 .conversation{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid #d0e6d6;border-radius:20px;background:rgba(255,255,255,.8);overflow:hidden}
+.audio-feedback{flex-shrink:0;padding:14px 18px 10px;border-bottom:1px solid #d0e6d6;background:#f8fcf9}
+.audio-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
+.audio-tools label{font-weight:600}.audio-tools select{min-width:0;flex:1;max-width:360px;width:140px;padding:6px 10px}
+.audio-tools button{font-size:13px;padding:6px 12px}.mic-device{flex-basis:100%;color:#5C8065;font-size:12px;overflow-wrap:anywhere}
+.in-call .audio-tools>label,.in-call .audio-tools>select,.in-call .audio-tools>[data-test-mic]{display:none}.in-call .mic-device{flex:1}
+.audio-meters{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.meter{min-width:0;border:1px solid #c8e8d0;border-radius:16px;padding:10px 14px;background:#eaf7ee;transition:background .12s,box-shadow .12s}
+.meter-ai{background:#eef5fd;border-color:#cedef0;color:#285780}
+.meter-user.speaking{background:#d0f1db;box-shadow:inset 0 0 25px #4aba6833}
+.meter-ai.speaking{background:#dceeff;box-shadow:inset 0 0 25px #53a2fa33}
+.meter-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:14px}.meter-head span{font-size:12px}
+.input-wave{height:64px;display:flex;align-items:center;justify-content:center;gap:4px}
+.input-wave i{display:block;flex:1;max-width:10px;min-width:2px;height:4px;background:#269353;border-radius:8px;transition:height 75ms linear}
+.output-wave{display:block;width:100%;height:64px;overflow:visible}.wave-fill{fill:#69aef2;opacity:.55}.wave-line{fill:none;stroke:#2879c5;stroke-width:2.5}
+.mic-health{font-size:12px;color:#5C8065;margin-top:8px;min-height:19px}.mic-health.warning{color:#945316;font-weight:600}
 .transcript{flex:1;min-height:0;overflow:auto;padding:24px;overscroll-behavior:contain;scrollbar-color:#bcdcc5 transparent}
 .empty{height:100%;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;color:#5C8065}
 .orb{display:grid;place-items:center;width:78px;height:78px;border-radius:50%;background:#D5F0DA;color:#2B7E43;font-size:36px}
@@ -61,3 +76,6 @@ footer{display:flex;align-items:center;gap:12px;flex-shrink:0}
 @media(max-width:650px){.page{gap:10px;padding-left:12px;padding-right:12px}h1{font-size:22px}header{gap:10px}.sub{font-size:12px}.workspace{flex-direction:column;gap:10px}.material{flex:0 0 34%;min-height:150px;padding:12px}.material h2{font-size:15px;margin-bottom:0}.material .note{display:none}.transcript{padding:14px}.model-row{gap:8px}.model-row .note{flex-basis:100%;font-size:12px}.model-row select{flex:1;min-width:0}footer{flex-wrap:wrap;gap:8px}.status-wrap{flex-basis:100%}.status{font-size:14px}.status-wrap .note{font-size:11px}.controls{width:100%}.controls button{flex:1}.empty .orb{width:54px;height:54px;font-size:26px}.empty strong{font-size:18px}}
 @media(max-height:500px) and (min-width:651px){.page{gap:8px}h1{font-size:20px}.sub,.model-row .note,.status-wrap .note,.material .note{display:none}.material{padding:12px;gap:4px}.material h2{margin:0}.material textarea{min-height:70px}.transcript{padding:14px}.empty .orb{display:none}.quick{padding:6px 12px}}
 @media(max-width:650px){.model-row select{flex:1 1 calc(100% - 100px)}.model-row .note{flex:1 1 140px;order:1}.model-row [data-settings]{order:2}}
+@media(max-width:650px){.audio-feedback{padding:10px}.audio-meters{gap:8px}.meter{padding:8px}.meter-head{flex-direction:column;align-items:flex-start;gap:0;font-size:13px}.meter-head span{font-size:11px}.input-wave,.output-wave{height:48px}.input-wave{gap:3px}.input-wave i{max-height:46px}.audio-tools{gap:6px;margin-bottom:8px}.mic-health{font-size:11px}.mic-device{font-size:11px}.material{flex:0 0 26%;min-height:175px}.material textarea{min-height:80px}.empty{min-height:65px}.empty .orb{display:none}.empty strong{font-size:16px}.empty p{font-size:12px}}
+@media(max-height:500px) and (min-width:651px){.audio-feedback{padding:6px 12px}.audio-tools{margin-bottom:4px}.audio-tools select,.audio-tools button{min-height:32px;padding:3px 8px}.mic-device{flex-basis:auto;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meter{padding:4px 10px}.input-wave,.output-wave{height:36px}.input-wave i{max-height:34px}.mic-health{margin-top:2px}.audio-meters{gap:8px}}
+@media(prefers-reduced-motion:reduce){.input-wave i,.meter{transition:none}}
