@@ -71,12 +71,17 @@
           const level = Math.sqrt(power / (samples.length || 1));
           if (!run.muted && level > 0.003) run.lastSound = Date.now();
           if (!run.muted) this.emit('inputLevel', { level: level, bands: bands });
-          if (!run.ready || run.muted || run.testing) return;
+          if (run.muted) return;
+          if (run.testing) { this.emit('inputPCM', { buffer: event.data, sent: false }); return; }
+          if (!run.ready) return;
           if (run.socket.bufferedAmount > 128000) {
             this.fail(run, '網路太慢，已停止通話；請換穩定的網路再開始');
             return;
           }
-          if (this.send(run, { realtimeInput: { audio: { data: encode(event.data), mimeType: 'audio/pcm;rate=16000' } } })) run.sentAudio = true;
+          if (this.send(run, { realtimeInput: { audio: { data: encode(event.data), mimeType: 'audio/pcm;rate=16000' } } })) {
+            run.sentAudio = true;
+            this.emit('inputPCM', { buffer: event.data, sent: true });
+          }
         };
         run.input.connect(run.processor);
         run.processor.connect(run.context.destination);

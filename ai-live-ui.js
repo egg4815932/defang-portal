@@ -7,7 +7,7 @@
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = new URL('ai-live.css?v=20260919-4', assetBase).href;
+  css.href = new URL('ai-live.css?v=20260920-1', assetBase).href;
   shadow.appendChild(css);
   document.body.appendChild(host);
   let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
@@ -47,6 +47,7 @@
     if (view.material) view.material.disabled = active;
     view.settings.lock(active);
     view.feedback.lock(active, active && view.testing);
+    view.capture.lock(active, ready && !view.muted || active && view.testing);
     view.stop.textContent = view.testing ? '結束測試' : '結束通話';
     view.mute.hidden = !active || view.testing;
     clearInterval(view.keepAlive);
@@ -91,7 +92,7 @@
     current = null;
     cancelPending();
     host.hidden = true;
-    Object.values(views).forEach(view => { view.settings.close(); view.page.hidden = true; });
+    Object.values(views).forEach(view => { view.capture.clear(); view.settings.close(); view.page.hidden = true; });
   }
   function resetAll() {
     close();
@@ -127,7 +128,7 @@
         '<button type="button" data-prompt="請根據教材出一道口頭練習題，等我回答後再給回饋，不要先公布答案。">出題練習</button></div>' : '') +
       '</div></div><footer><div class="status-wrap"><p class="status" role="status" aria-live="polite">' +
       (tutor ? '先貼上教材，再開始陪練' : '準備好就按開始對話') +
-      '</p><p class="note">開始後會將聲音' + (tutor ? '與教材' : '') + '送至 Gemini；此系統不保存錄音。</p></div>' +
+      '</p><p class="note">開始後會將聲音' + (tutor ? '與教材' : '') + '送至 Gemini；僅手動試聽會暫存本機音檔。</p></div>' +
       '<div class="controls"><button type="button" class="primary" data-start>' + (tutor ? '開始陪練' : '開始對話') +
       '</button><button type="button" data-mute hidden>靜音</button><button type="button" class="stop" data-stop hidden>結束通話</button></div></footer>';
     shadow.appendChild(page);
@@ -141,6 +142,22 @@
     view.settings = new window.DFAISettings(mode, view.model);
     view.feedback = new window.DFAIFeedback(mode);
     page.querySelector('.conversation').prepend(view.feedback.element);
+    view.capture = new window.DFAICapture(async () => {
+      if (current !== view || view.capture.active) return;
+      if (!view.busy) {
+        view.testing = true;
+        controls(view, true, false);
+        view.capture.record.disabled = true;
+        const started = await view.client.start(null, view.feedback.select.value, view.settings.get());
+        if (!started || current !== view || !view.client.run) return;
+      }
+      const run = view.client.run;
+      if (!run || run.muted || !run.testing && !run.ready) return;
+      view.capture.start(!run.testing);
+    }, () => {
+      if (view.testing && view.client.run) end(view, '試錄已結束，可以播放處理後的聲音');
+    });
+    view.feedback.element.after(view.capture.element);
     view.feedback.test.addEventListener('click', async () => {
       if (view.testing && view.busy) { end(view, '麥克風測試已結束'); return; }
       if (view.busy || current !== view) return;
@@ -168,10 +185,11 @@
         controls(view, true, true);
         if (!info.resumed && tutor) view.client.prompt('我已準備好，請依照設定的教學方式開始。');
       },
-      ended: () => controls(view, false, false),
+      ended: () => { view.capture.finish(); controls(view, false, false); },
       error: text => status(view, text, true),
       activity: activity,
       inputLevel: event => view.feedback.level('input', event),
+      inputPCM: event => view.capture.add(event),
       outputLevel: event => view.feedback.level('output', event),
       inputState: state => view.feedback.state(state),
       device: info => view.feedback.device(info)
@@ -195,13 +213,16 @@
     view.stop.addEventListener('click', () => { end(view, '通話已結束；再次開始會建立新對話'); cancelPending(); });
     view.mute.addEventListener('click', () => {
       view.muted = !view.muted;
+      view.capture.finish();
       view.client.mute(view.muted);
+      view.capture.lock(true, !view.muted && view.client.run && view.client.run.ready);
       view.mute.textContent = view.muted ? '取消靜音' : '靜音';
       activity();
     });
     view.model.addEventListener('change', () => {
       view.settings.save();
       end(view, '已切換模型，按開始建立新對話');
+      view.capture.clear();
       cancelPending();
       activity();
     });
@@ -269,7 +290,7 @@
     if (current && current.settings.element.open) { activity(); return; }
     if (event.key === 'Escape') close();
     if (event.key === 'Tab' && current) {
-      const focusable = Array.from(current.page.querySelectorAll('button,select,textarea')).filter(el => !el.disabled && !el.hidden && el.getClientRects().length);
+      const focusable = Array.from(current.page.querySelectorAll('button,select,textarea,summary,audio[controls]')).filter(el => !el.disabled && !el.hidden && el.getClientRects().length);
       const first = focusable[0], last = focusable[focusable.length - 1];
       if (event.shiftKey && shadow.activeElement === first) { last.focus(); event.preventDefault(); }
       if (!event.shiftKey && shadow.activeElement === last) { first.focus(); event.preventDefault(); }
@@ -277,7 +298,7 @@
     activity();
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && current) { end(current, '已暫停收音，按開始重新連線'); cancelPending(); }
+    if (document.hidden && current) { end(current, '已暫停收音，按開始重新連線'); current.capture.clear(); cancelPending(); }
   });
   window.addEventListener('pagehide', close);
   const app = document.querySelector('#appFrameViewport > iframe');
