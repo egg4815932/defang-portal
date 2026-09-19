@@ -28,6 +28,8 @@
       this.stop();
       const run = { ready: false, muted: false, reconnects: 0, testing: !getTicket,
         lastFrame: Date.now(), lastSound: Date.now(), sentAudio: false };
+      run.settings = captureSettings || {};
+      run.manualSpeaking = false;
       this.run = run;
       const current = () => this.run === run;
       try {
@@ -41,7 +43,7 @@
         // 啟動手勢內喚醒，但不讓尚未取得裝置時的 resume 卡住權限流程。
         run.context.resume().catch(() => {});
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: Object.assign({ channelCount: 1, echoCancellation: !captureSettings || captureSettings.echo !== 'off', noiseSuppression: true, autoGainControl: true },
+          audio: Object.assign({ channelCount: 1, echoCancellation: run.settings.echo !== 'off', noiseSuppression: run.settings.noiseSuppression !== 'off', autoGainControl: run.settings.autoGainControl !== 'off' },
             deviceId ? { deviceId: { exact: deviceId } } : {})
         });
         if (!current()) { stream.getTracks().forEach(track => track.stop()); return false; }
@@ -73,6 +75,7 @@
           if (run.muted) return;
           if (run.testing) { this.emit('inputPCM', { buffer: event.data, sent: false }); return; }
           if (!run.ready) return;
+          if (run.settings.automatic === 'off' && !run.manualSpeaking) return;
           if (run.socket.bufferedAmount > 128000) {
             this.fail(run, '網路太慢，已停止通話；請換穩定的網路再開始');
             return;
@@ -125,7 +128,7 @@
         const ticket = await getTicket();
         if (!current()) return false;
         run.ticket = ticket;
-        run.expiry = setTimeout(() => this.fail(run, '本次通話已滿 30 分鐘，請按開始建立新對話'),
+        run.expiry = setTimeout(() => this.fail(run, '本次通話已達設定期限，請按開始建立新對話'),
           Math.max(0, ticket.expiresAt - Date.now()));
         this.connect(run, false);
         return true;
@@ -141,6 +144,7 @@
     connect(run, resume) {
       if (this.run !== run) return;
       run.ready = false;
+      run.manualSpeaking = false;
       run.sentAudio = false;
       if (run.socket) {
         run.socket.onclose = null;
@@ -151,7 +155,7 @@
       const socket = new WebSocket(ENDPOINT + encodeURIComponent(run.ticket.token));
       run.socket = socket;
       let messages = Promise.resolve();
-      run.timeout = setTimeout(() => this.fail(run, '連線逾時，請稍後再試'), 20000);
+      run.timeout = setTimeout(() => this.fail(run, '連線逾時，請稍後再試'), ((run.settings || {}).timeoutSeconds || 20) * 1000);
       socket.onopen = () => {
         if (this.run !== run || run.socket !== socket) return;
         const setup = JSON.parse(JSON.stringify(run.ticket.setup));
@@ -174,7 +178,8 @@
       };
     }
     resume(run) {
-      if (!run.resumeHandle || run.reconnects >= 2 || run.ticket.expiresAt - Date.now() < 10000) return false;
+      const settings = run.settings || {};
+      if (settings.resumption === 'off' || !run.resumeHandle || run.reconnects >= (settings.reconnects === undefined ? 2 : settings.reconnects) || run.ticket.expiresAt - Date.now() < 10000) return false;
       run.reconnects++;
       clearTimeout(run.timeout);
       this.clearAudio(run);
@@ -228,7 +233,20 @@
       }
       return false;
     }
-    prompt(text) { if (this.run) this.send(this.run, { realtimeInput: { text: text } }); }
+    prompt(text) {
+      const run = this.run;
+      if (!run) return;
+      if ((run.settings || {}).automatic === 'off') this.send(run, { clientContent: { turns: [{ role: 'user', parts: [{ text: text }] }], turnComplete: true } });
+      else this.send(run, { realtimeInput: { text: text } });
+    }
+    manualTurn() {
+      const run = this.run;
+      if (!run || !run.ready || run.muted || (run.settings || {}).automatic !== 'off') return false;
+      const key = run.manualSpeaking ? 'activityEnd' : 'activityStart';
+      if (!this.send(run, { realtimeInput: { [key]: {} } })) return false;
+      run.manualSpeaking = !run.manualSpeaking;
+      return true;
+    }
     resumeAudio() {
       const run = this.run;
       if (!run) return;
@@ -240,7 +258,10 @@
       run.muted = value;
       run.lastSound = Date.now();
       if (run.stream) run.stream.getAudioTracks().forEach(track => { track.enabled = !value; });
-      if (value) this.send(run, { realtimeInput: { audioStreamEnd: true } });
+      if (value && (run.settings || {}).automatic === 'off') {
+        if (run.manualSpeaking) this.send(run, { realtimeInput: { activityEnd: {} } });
+        run.manualSpeaking = false;
+      } else if (value) this.send(run, { realtimeInput: { audioStreamEnd: true } });
       if (value) this.emit('inputLevel', { level: 0, bands: [] });
       this.emit('state', value ? '麥克風已靜音' : '已連線，可以繼續說話');
     }
