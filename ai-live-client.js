@@ -212,7 +212,8 @@
       source.connect(run.output);
       run.sources.add(source);
       source.onended = () => { run.sources.delete(source); source.disconnect(); };
-      const when = Math.max(run.context.currentTime + 0.02, run.nextTime);
+      // 首包／斷流後保留 120ms 緩衝；已排隊的片段精準相接，不能每包再加 20ms 空白。
+      const when = run.nextTime > run.context.currentTime + 0.005 ? run.nextTime : run.context.currentTime + 0.12;
       source.start(when);
       run.nextTime = when + buffer.duration;
     }
