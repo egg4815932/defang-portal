@@ -17,13 +17,14 @@
     ['pace', '語速', [['slow', '慢一點'], ['normal', '自然'], ['fast', '快一點']]],
     ['length', '回答長短', [['brief', '簡短 · 兩三句'], ['balanced', '適中 · 重點加例子'], ['detailed', '詳細 · 分段解釋']]],
     ['thinking', '思考深度', [['LOW', '低'], ['MEDIUM', '中'], ['HIGH', '高']]],
-    ['pause', '停頓多久才接話', [['auto', '自動'], ['300', '0.3 秒 · 快速接話'], ['700', '0.7 秒'], ['1200', '1.2 秒'], ['1800', '1.8 秒 · 多等我一下']]],
+    ['detection', '說話偵測', [['noise-resistant', '抗雜音優先（預設）'], ['sensitive', '輕聲優先 · 較容易觸發']]],
+    ['pause', '停頓多久才接話', [['auto', '建議 · 等 1.2 秒'], ['300', '0.3 秒 · 容易在停頓時接話'], ['700', '0.7 秒'], ['1200', '1.2 秒'], ['1800', '1.8 秒 · 多等我一下']]],
     ['interruption', '我說話時打斷 AI', [['on', '開啟 · AI 停下來聽'], ['off', '關閉 · 讓 AI 說完']]],
     ['subtitles', '文字字幕', [['both', '雙方都顯示'], ['user', '只顯示我的話'], ['model', '只顯示 AI 的話'], ['off', '關閉字幕']]],
     ['teaching', '教學方式', [['ask', '先問我要講解或練習'], ['explain', '先講解，再確認理解'], ['quiz', '先出題，回答後講解'], ['hint', '先出題，答錯先給提示']]]
   ];
   const defaults = { voice: 'Kore', language: 'zh-TW', role: 'assistant', tone: 'natural', pace: 'normal',
-    length: 'brief', thinking: 'LOW', pause: 'auto', interruption: 'on', subtitles: 'both', teaching: 'ask', customLanguage: '', accent: '' };
+    length: 'brief', thinking: 'LOW', pause: 'auto', detection: 'noise-resistant', interruption: 'on', subtitles: 'both', teaching: 'ask', customLanguage: '', accent: '' };
   window.DFAISettings = function (mode, model) {
     const storageKey = 'defang.ai.settings.v1.' + mode;
     const values = Object.assign({}, defaults);
@@ -51,6 +52,7 @@
       '<p class="note">語言、口音、語氣、語速與教學方式會引導 AI 回應，實際表現可能略有不同。語速不是固定倍速。</p>' +
       '<p class="note" data-language-check>台灣中文模式會檢查 AI 回覆文字，明顯外語會停播並重答一次；關閉字幕仍會檢查。整段外語練習請改選回應語言。</p>' +
       '<p class="note">思考深度只適用 Extended Thinking；越高可能等越久。接話時間是停頓判定，不是保證的回應速度。</p>' +
+      '<p class="note">雜音常打斷 AI，先用「抗雜音優先」。輕聲說話常沒被接住，可試「輕聲優先」，但也較容易被雜音觸發。完全不想被打斷，可關閉「我說話時打斷 AI」。</p>' +
       '<button type="button" data-defaults>還原這個介面的預設</button></fieldset></div>' +
       '<p class="note settings-storage" role="status">設定保存在這個瀏覽器；不保存教材與對話。</p>';
     const grid = dialog.querySelector('.settings-grid'), inputs = {};
