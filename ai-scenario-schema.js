@@ -12,7 +12,20 @@ var DFAISchema = (function () {
     fields.push({ key: key, label: label, group: group, type: 'text', value: value, max: max || 2000, hint: hint || '文字指令：引導 AI，不是硬性開關。留白代表不加這段交代。' });
   }
   var onoff = [['on', '開啟'], ['off', '關閉']];
-  choice('voice', '音色', '聲音與語言', 'Kore Zephyr Puck Charon Fenrir Leda Orus Aoede Callirrhoe Autonoe Enceladus Iapetus Umbriel Algieba Despina Erinome Algenib Rasalgethi Laomedeia Achernar Alnilam Schedar Gacrux Pulcherrima Achird Zubenelgenubi Vindemiatrix Sadachbia Sadaltager Sulafat'.split(' ').map(function (v) { return [v, v]; }), 'Kore', 'API 原生設定');
+  // Google 官方 Gemini TTS 性別分類與 Live API 音色特色，核對於 2026-09-20。
+  var voices = [
+    ['Kore','女聲','堅定'], ['Zephyr','女聲','明亮'], ['Puck','男聲','活潑'],
+    ['Charon','男聲','解說感'], ['Fenrir','男聲','熱情'], ['Leda','女聲','年輕感'],
+    ['Orus','男聲','堅定'], ['Aoede','女聲','輕快'], ['Callirrhoe','女聲','隨和'],
+    ['Autonoe','女聲','明亮'], ['Enceladus','男聲','氣聲感'], ['Iapetus','男聲','清晰'],
+    ['Umbriel','男聲','隨和'], ['Algieba','男聲','流暢'], ['Despina','女聲','流暢'],
+    ['Erinome','女聲','清晰'], ['Algenib','男聲','沙啞'], ['Rasalgethi','男聲','解說感'],
+    ['Laomedeia','女聲','活潑'], ['Achernar','女聲','柔和'], ['Alnilam','男聲','堅定'],
+    ['Schedar','男聲','平穩'], ['Gacrux','女聲','成熟'], ['Pulcherrima','女聲','直接'],
+    ['Achird','男聲','親切'], ['Zubenelgenubi','男聲','輕鬆'], ['Vindemiatrix','女聲','溫柔'],
+    ['Sadachbia','男聲','有活力'], ['Sadaltager','男聲','博學感'], ['Sulafat','女聲','溫暖']
+  ];
+  choice('voice', '音色', '聲音與語言', voices.map(function (v) { return [v[0], v.join(' · ')]; }), 'Kore', '男聲／女聲與特色依 Google 官方分類，實際表現也會受語言、指令影響。');
   choice('language', '回應語言', '聲音與語言', [['zh-TW', '台灣中文'], ['en-US', '美式英語'], ['en-GB', '英式英語'], ['ja', '日語'], ['ko', '韓語'], ['auto', '跟隨我說的語言'], ['custom', '自訂']], 'zh-TW', '以文字指令引導，不攔截模型音訊。');
   text('customLanguage', '自訂語言', '聲音與語言', '', 60, '選擇自訂語言時必填。');
   text('accent', '口音偏好', '聲音與語言', '', 60);
@@ -109,5 +122,5 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
-  return { fields: fields, normalize: normalize, instruction: instruction, defaults: defaults, migrate: migrate };
+  return { fields: fields, voices: voices, normalize: normalize, instruction: instruction, defaults: defaults, migrate: migrate };
 })();

@@ -9,8 +9,8 @@
     let items = [], selectedId = builtins[0].id, editingId = '', revision = 0, dirty = false, loading = false, loaded = false, generation = 0;
     let busy = false;
     const page = document.createElement('section'); page.id = 'ai-tutor'; page.className = 'page scenario-page'; page.hidden = true;
-    page.setAttribute('role', 'dialog'); page.setAttribute('aria-modal', 'true'); page.setAttribute('aria-label', 'AI 教材陪練・情境設定');
-    page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 教材陪練</h1><p class="sub">情境設定庫 · 通話統一在 AI 語音對話</p></div><button type="button" data-use>前往對話</button></header>' +
+    page.setAttribute('role', 'dialog'); page.setAttribute('aria-modal', 'true'); page.setAttribute('aria-label', 'AI 語音設定');
+    page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 語音設定</h1><p class="sub">情境設定庫 · 通話統一在 AI 語音對話</p></div><button type="button" data-use>前往對話</button></header>' +
       '<div class="scenario-layout"><aside class="scenario-library"><label>已儲存的情境<select data-library aria-label="已儲存的情境"></select></label>' +
       '<div class="scenario-actions"><button type="button" data-new>＋ 新情境</button><button type="button" data-copy>複製這份</button><button type="button" data-reload>重新載入</button></div>' +
       '<details><summary>儲存說明／匯入舊設定</summary><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">原語音對話</button><button type="button" data-import="tutor">原教材陪練</button></details></aside>' +
@@ -26,6 +26,7 @@
     const label = document.createElement('label'); label.className = 'scenario-picker'; label.append(document.createTextNode('情境'), selector);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
     const groups = new Map();
+    const notes = new window.DFAIVoiceNotes(hooks.notesRpc, hooks.activity);
     S.fields.forEach(f => {
       if (!groups.has(f.group)) {
         const details = document.createElement('details'); details.className = 'scenario-group';
@@ -53,6 +54,10 @@
       input.dataset.setting = f.key; input.setAttribute('aria-label', f.label); wrap.append(input);
       if (f.hint) { const hint = document.createElement('small'); hint.textContent = f.hint; wrap.append(hint); }
       controls[f.key] = input; groups.get(f.group).append(wrap);
+      if (f.key === 'voice') {
+        wrap.className = 'wide'; groups.get(f.group).append(notes.element);
+        input.addEventListener('change', () => notes.select(input.value));
+      }
     });
     function all() { return builtins.concat(items); }
     function current() { return all().find(item => item.id === selectedId) || builtins[0]; }
@@ -77,6 +82,7 @@
       name.value = scene.name; model.value = scene.model; material.value = scene.material;
       S.fields.forEach(f => { controls[f.key].value = scene.settings[f.key]; if (output[f.key]) output[f.key].value = scene.settings[f.key]; });
       editingId = id || ''; revision = rev || 0; dirty = false;
+      notes.select(controls.voice.value);
       updateInstruction(); find('[data-delete]').disabled = !editingId || loading;
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
     }
@@ -92,6 +98,7 @@
       page.querySelectorAll('input,select,textarea,button').forEach(el => { if (!el.matches('[data-close]')) el.disabled = value; });
       selector.disabled = value || busy;
       find('[data-delete]').disabled = value || !editingId; updateInstruction();
+      notes.lock(value);
     }
     async function load(force) {
       if (loaded && !force) return;
@@ -156,9 +163,9 @@
     choices(); fill(general);
     return { page, selector, picker: label, info, load, current: () => S.normalize(current().scene),
       get loading() { return loading; },
-      edit: () => { if (!dirty) { const item = current(); fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision); } },
+      edit: () => { notes.load(); if (!dirty) { const item = current(); fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision); } },
       lock: value => { busy = value; selector.disabled = busy || loading; },
-      reset: () => { generation++; items = []; selectedId = builtins[0].id; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
+      reset: () => { generation++; notes.reset(); items = []; selectedId = builtins[0].id; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };
   };

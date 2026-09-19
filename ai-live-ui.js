@@ -14,7 +14,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260920-2', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-4', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-6', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
@@ -139,9 +139,9 @@
     page.hidden = true;
     page.setAttribute('role', 'dialog');
     page.setAttribute('aria-modal', 'true');
-    page.setAttribute('aria-label', tutor ? 'AI 教材陪練' : 'AI 語音對話');
+    page.setAttribute('aria-label', tutor ? 'AI 語音設定' : 'AI 語音對話');
     page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>' +
-      (tutor ? 'AI 教材陪練' : 'AI 語音對話') + '</h1><p class="sub">' +
+      (tutor ? 'AI 語音設定' : 'AI 語音對話') + '</h1><p class="sub">' +
       (tutor ? '貼上教材，一起弄懂，再練習說出答案。' : '像打電話一樣，直接說出你想問的事。') +
       '</p></div></header><div class="model-row"><label for="model-' + mode + '">Gemini 3.8</label>' +
       '<select id="model-' + mode + '"><option value="gemini-3.8-live">一般版（Live）</option>' +
@@ -169,7 +169,7 @@
     };
     view.settings = new window.DFAISettings(mode, view.model);
     view.settings.get = () => scenarios.current().settings;
-    view.settings.open = () => switchView('tutor');
+    view.settings.open = () => {}; // 設定頁只能從有權限的系統側欄進入。
     view.settings.valid = () => !scenarios.loading;
     view.feedback = new window.DFAIFeedback(mode);
     page.querySelector('.conversation').prepend(view.feedback.element);
@@ -198,7 +198,7 @@
     });
     view.feedback.resume.addEventListener('click', () => view.client.resumeAudio());
     page.appendChild(view.settings.element);
-    page.querySelector('[data-settings]').addEventListener('click', () => { view.settings.open(); activity(); });
+
     function empty() {
       view.lines = {};
       if (view.compact) { view.log.innerHTML = view.compact.empty(); return; }
@@ -275,6 +275,7 @@
       activity();
     });
     view.compact = new window.DFAICompact(view);
+    page.querySelector('[data-settings]').remove();
     view.manual = document.createElement('button'); view.manual.type = 'button'; view.manual.className = 'manual-turn'; view.manual.dataset.manualTurn = '';
     view.manual.hidden = true; view.manual.textContent = '開始說話';
     view.manual.onclick = () => { if (view.client.manualTurn()) controls(view, true, true); activity(); };
@@ -284,7 +285,7 @@
     controls(view, false, false);
     return view;
   }
-  const scenarios = new window.DFAIScenarios({ rpc: options => ticket(options, 'ai-live-scenarios'), activity: activity,
+  const scenarios = new window.DFAIScenarios({ rpc: options => ticket(options, 'ai-live-scenarios'), notesRpc: options => ticket(options, 'ai-live-voice-notes'), activity: activity,
     use: () => switchView('chat'), change: scene => {
       if (views.chat) {
         views.chat.model.value = scene.model;
