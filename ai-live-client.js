@@ -27,7 +27,7 @@
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
     async start(getTicket, deviceId) {
       this.stop();
-      const run = { sources: new Set(), ready: false, muted: false, nextTime: 0, reconnects: 0, testing: !getTicket,
+      const run = { ready: false, muted: false, reconnects: 0, testing: !getTicket,
         lastFrame: Date.now(), lastSound: Date.now(), sentAudio: false };
       this.run = run;
       const current = () => this.run === run;
@@ -83,6 +83,16 @@
         run.output = run.context.createAnalyser();
         run.output.fftSize = 1024;
         run.output.connect(run.context.destination);
+        if (!run.testing) {
+          await run.context.audioWorklet.addModule(new URL('ai-live-playback.js?v=20260919-8', new URL(this.processorUrl, location.href)).href);
+          if (!current()) return false;
+          run.player = new AudioWorkletNode(run.context, 'defang-playback', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+          run.player.connect(run.output);
+          run.player.onprocessorerror = () => { if (current()) this.fail(run, '播放處理中斷，請重新開始'); };
+          run.player.port.onmessage = ({ data }) => {
+            if (current() && data.type === 'overflow') this.fail(run, '音訊累積過多，已停止通話；請重新開始');
+          };
+        }
         const outputSamples = new Float32Array(run.output.fftSize);
         run.monitor = setInterval(() => {
           if (!current()) return;
@@ -224,19 +234,9 @@
       const rateMatch = /rate=(\d+)/.exec(data.mimeType || '');
       const rate = rateMatch ? Number(rateMatch[1]) : 24000;
       const samples = decode(data.data);
-      if (!samples.length || rate < 8000 || rate > 96000) return;
-      if (run.nextTime - run.context.currentTime > 30) throw new Error('音訊累積過多');
-      const buffer = run.context.createBuffer(1, samples.length, rate);
-      buffer.copyToChannel(samples, 0);
-      const source = run.context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(run.output);
-      run.sources.add(source);
-      source.onended = () => { run.sources.delete(source); source.disconnect(); };
-      // 首包／斷流後保留 120ms 緩衝；已排隊的片段精準相接，不能每包再加 20ms 空白。
-      const when = run.nextTime > run.context.currentTime + 0.005 ? run.nextTime : run.context.currentTime + 0.12;
-      source.start(when);
-      run.nextTime = when + buffer.duration;
+      if (!samples.length) return;
+      if (rate !== 24000) throw new Error('不支援的回覆音訊採樣率');
+      run.player.port.postMessage({ type: 'audio', samples }, [samples.buffer]);
     }
     send(run, value) {
       if (this.run === run && run.ready && run.socket && run.socket.readyState === 1) {
@@ -261,9 +261,7 @@
       this.emit('state', value ? '麥克風已靜音' : '已連線，可以繼續說話');
     }
     clearAudio(run) {
-      run.sources.forEach(source => { try { source.stop(); source.disconnect(); } catch (error) {} });
-      run.sources.clear();
-      run.nextTime = 0;
+      if (run.player) run.player.port.postMessage({ type: 'clear' });
     }
     fail(run, message) {
       if (this.run !== run) return;
@@ -285,6 +283,7 @@
       if (run.processor) { run.processor.port.onmessage = null; run.processor.onprocessorerror = null; run.processor.disconnect(); }
       if (run.input) run.input.disconnect();
       this.clearAudio(run);
+      if (run.player) { run.player.port.onmessage = null; run.player.onprocessorerror = null; run.player.disconnect(); }
       if (run.output) run.output.disconnect();
       this.emit('inputLevel', { level: 0, bands: [] });
       this.emit('outputLevel', { level: 0, bands: [] });
