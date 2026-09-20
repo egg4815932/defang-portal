@@ -26,6 +26,7 @@ var DFAISchema = (function () {
     ['Sadachbia','男聲','有活力'], ['Sadaltager','男聲','博學感'], ['Sulafat','女聲','溫暖']
   ];
   choice('voice', '音色', '聲音與語言', voices.map(function (v) { return [v[0], v.join(' · ')]; }), 'Kore', '男聲／女聲與特色依 Google 官方分類，實際表現也會受語言、指令影響。');
+  choice('openaiVoice', 'GPT-Live 音色', '聲音與語言', ['marin', 'cedar', 'alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'quartz', 'ripple', 'vesper', 'willow', 'stone', 'gleam', 'meridian', 'bossa', 'tempo', 'beacon', 'delta', 'cinder'].map(function (v) { return [v, v]; }), 'marin', 'GPT-Live 專用音色；回應語言仍由下方語言設定引導。');
   choice('language', '回應語言', '聲音與語言', [['zh-TW', '台灣中文'], ['en-US', '美式英語'], ['en-GB', '英式英語'], ['ja', '日語'], ['ko', '韓語'], ['auto', '跟隨我說的語言'], ['custom', '自訂']], 'zh-TW', '以文字指令引導，不攔截模型音訊。');
   text('customLanguage', '自訂語言', '聲音與語言', '', 60, '選擇自訂語言時必填。');
   text('accent', '口音偏好', '聲音與語言', '', 60);
@@ -78,7 +79,7 @@ var DFAISchema = (function () {
     var out = { version: 1, name: str(raw.name, '新情境', 80, '名稱'), model: raw.model || 'gemini-3.8-live',
       material: str(raw.material, '', 12000, '教材'), settings: {} };
     if (!out.name) throw new Error('請填情境名稱');
-    if (['gemini-3.8-live', 'gemini-3.8-live-extended-thinking'].indexOf(out.model) < 0) throw new Error('不支援此模型');
+    if (['gemini-3.8-live', 'gemini-3.8-live-extended-thinking', 'gpt-live-1'].indexOf(out.model) < 0) throw new Error('不支援此模型');
     var input = raw.settings === undefined ? {} : raw.settings;
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('情境設定格式不正確');
     fields.forEach(function (f) {

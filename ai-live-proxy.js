@@ -4,11 +4,13 @@
   const bridge = window.DFAIEmbedded;
   let client, sequence = 0;
   const devices = new Map();
+  const sessionClosers = new Map();
   class ProxyClient {
     constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.id = 0; client = this; }
     async start(getTicket, deviceId, settings) {
       this.stop();
       const id = ++sequence; this.id = id; this.getTicket = getTicket;
+      if (getTicket && settings && settings.provider === 'openai') sessionClosers.set(id, getTicket);
       this.run = { ready: false, muted: false, testing: !getTicket, manualSpeaking: false };
       return new Promise(resolve => {
         this.resolveStart = resolve;
@@ -42,6 +44,16 @@
     }
   }
   bridge.onAudio(async m => {
+    if (m.type === 'close-session') {
+      const close = sessionClosers.get(m.runId);
+      if (close) {
+        sessionClosers.delete(m.runId);
+        close({ action: 'close', sessionId: m.sessionId }).catch(() => {
+          if (client && client.callbacks.error) client.callbacks.error('OpenAI 結束確認未完成；下次通話會先清理舊連線');
+        });
+      }
+      return;
+    }
     if (m.type === 'devices') {
       const request = devices.get(m.requestId);
       if (request) { clearTimeout(request.timer); request.resolve(m.devices); devices.delete(m.requestId); }
@@ -49,10 +61,11 @@
     }
     if (!client || m.runId !== client.id) return;
     if (m.type === 'need-ticket') {
-      const id = client.id;
+      const id = client.id, getTicket = client.getTicket;
       try {
-        const ticket = await client.getTicket();
+        const ticket = await getTicket(m.options);
         if (id === client.id) bridge.audio({ command: 'ticket', runId: id, ticket });
+        else if (ticket && ticket.provider === 'openai') getTicket({ action: 'close', sessionId: ticket.sessionId }).catch(() => {});
       } catch (error) { if (id === client.id) bridge.audio({ command: 'ticket', runId: id, error: error.message }); }
       return;
     }

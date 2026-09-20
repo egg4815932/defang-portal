@@ -15,15 +15,20 @@
       '<div class="scenario-actions"><button type="button" data-new>＋ 新情境</button><button type="button" data-copy>複製這份</button><button type="button" data-reload>重新載入</button></div>' +
       '<details><summary>儲存說明／匯入舊設定</summary><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">原語音對話</button><button type="button" data-import="tutor">原教材陪練</button></details></aside>' +
       '<div class="scenario-editor"><div class="scenario-basics"><label>情境名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
-      '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option></select></label></div>' +
+      '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label></div>' +
+      '<p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
       '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label>一起儲存的教材<textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note">這裡顯示上述設定組合後，實際會交給 AI 的指令。開場訊息另送。</p><pre data-instruction></pre></details>' +
-      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音、輸入為單聲道 16 kHz PCM、播放為 24 kHz PCM。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。沒有搜尋或操作內部系統的工具；改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
+      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。沒有搜尋或操作內部系統的工具；改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
     const find = sel => page.querySelector(sel), controls = {}, output = {};
     const name = find('[data-name]'), model = find('[data-model]'), material = find('[data-material]'), library = find('[data-library]');
     const selector = document.createElement('select'); selector.dataset.scenario = ''; selector.setAttribute('aria-label', '套用情境');
     const label = document.createElement('label'); label.className = 'scenario-picker'; label.append(document.createTextNode('情境'), selector);
+    const callModel = document.createElement('select'); callModel.dataset.callModel = ''; callModel.setAttribute('aria-label', '本次通話模型');
+    Array.from(model.options).forEach(o => callModel.add(new Option(o.text, o.value)));
+    const modelLabel = document.createElement('label'); modelLabel.className = 'scenario-picker'; modelLabel.append(document.createTextNode('模型'), callModel);
+    const picker = document.createElement('div'); picker.className = 'scenario-call-pickers'; picker.append(label, modelLabel);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
     const groups = new Map();
     const notes = new window.DFAIVoiceNotes(hooks.notesRpc, hooks.activity);
@@ -68,6 +73,11 @@
       return S.normalize({ name: name.value, model: model.value, material: material.value, settings });
     }
     function updateInstruction() {
+      const openai = model.value === 'gpt-live-1';
+      find('[data-provider-note]').hidden = !openai;
+      controls.voice.closest('label').hidden = openai; notes.element.hidden = openai;
+      controls.openaiVoice.closest('label').hidden = !openai;
+      ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
       try { find('[data-instruction]').textContent = S.instruction(read()); }
       catch (error) { find('[data-instruction]').textContent = error.message; }
       find('[data-count]').textContent = material.value.length.toLocaleString() + ' / ' + output.materialLimit.value + ' 字';
@@ -90,13 +100,20 @@
     function choices() {
       [selector, library].forEach(el => { el.replaceChildren(); all().forEach(item => el.add(new Option(item.scene.name + (item.id.startsWith('builtin-') ? ' · 內建' : ''), item.id))); });
       selector.value = selectedId; library.value = editingId || selectedId;
-      info.textContent = current().scene.name + ' · ' + (current().scene.material ? '含教材' : '無教材') + ' · ' + (current().scene.model.endsWith('extended-thinking') ? 'Thinking' : 'Live');
+      callModel.value = current().scene.model;
+      describe();
       if (hooks.change) hooks.change(current().scene);
     }
+    function describe() {
+      info.textContent = current().scene.name + ' · ' + (current().scene.material ? '含教材' : '無教材') + ' · ' +
+        (callModel.value === 'gpt-live-1' ? 'GPT-Live：聲音與教材送至 OpenAI；US$0.05／分鐘，推理另計；自動接話與插話' : 'Gemini：聲音與教材送至 Google');
+    }
+    callModel.onchange = () => { describe(); hooks.change(S.normalize(Object.assign({}, current().scene, { model: callModel.value }))); hooks.activity(); };
     function lock(value) {
       loading = value;
       page.querySelectorAll('input,select,textarea,button').forEach(el => { if (!el.matches('[data-close]')) el.disabled = value; });
       selector.disabled = value || busy;
+      callModel.disabled = value || busy;
       find('[data-delete]').disabled = value || !editingId; updateInstruction();
       notes.lock(value);
     }
@@ -161,10 +178,10 @@
       } catch (error) { message('無法匯入：' + error.message, true); }
     }; });
     choices(); fill(general);
-    return { page, selector, picker: label, info, load, current: () => S.normalize(current().scene),
+    return { page, selector, picker, info, load, current: () => S.normalize(Object.assign({}, current().scene, { model: callModel.value })),
       get loading() { return loading; },
       edit: () => { notes.load(); if (!dirty) { const item = current(); fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision); } },
-      lock: value => { busy = value; selector.disabled = busy || loading; },
+      lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading; },
       reset: () => { generation++; notes.reset(); items = []; selectedId = builtins[0].id; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };

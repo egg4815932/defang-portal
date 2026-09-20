@@ -59,12 +59,16 @@
           if (id === runId && nonce === bindNonce) send('callback', { runId: id, name, value, run: snapshot() });
         };
       });
-      client = new window.DFLiveClient(callbacks, new URL('ai-live-processor.js?v=20260919-1', assets).href);
-      const getTicket = m.testing ? null : () => new Promise((resolve, reject) => {
+      const Client = !m.testing && m.settings && m.settings.provider === 'openai' ? window.DFOpenAILiveClient : window.DFLiveClient;
+      client = new Client(callbacks, new URL('ai-live-processor.js?v=20260919-1', assets).href);
+      const getTicket = m.testing ? null : options => new Promise((resolve, reject) => {
+        if (options && options.action === 'close') {
+          send('close-session', { runId: id, sessionId: options.sessionId }); resolve({ closed: true }); return;
+        }
         ticketWait = { resolve, reject, runId: id, timer: setTimeout(() => {
           if (ticketWait && ticketWait.runId === id) { ticketWait = null; reject(new Error('系統連線逾時，請重新登入後再試')); }
         }, 45000) };
-        send('need-ticket', { runId: id });
+        send('need-ticket', { runId: id, options });
       });
       const ok = await client.start(getTicket, m.deviceId, m.settings);
       if (id === runId && nonce === bindNonce) send('started', { runId: id, ok, run: snapshot() });

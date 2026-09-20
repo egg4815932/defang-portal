@@ -14,7 +14,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260920-2', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-6', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-7', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
@@ -62,6 +62,10 @@
     scenarios.lock(active);
     view.feedback.lock(active, active && view.testing);
     view.capture.lock(active, ready && !view.muted || active && view.testing);
+    if (active && !view.testing && view.sessionSettings && view.sessionSettings.provider === 'openai') {
+      view.capture.record.disabled = true;
+      view.capture.status.textContent = 'GPT-Live 通話使用 WebRTC；通話中不提供 PCM 取樣，結束後可做本機試錄。';
+    }
     view.stop.textContent = view.testing ? '結束測試' : '結束通話';
     view.mute.hidden = !active || view.testing;
     clearInterval(view.keepAlive);
@@ -82,6 +86,7 @@
     view.status.classList.toggle('error', !!error);
   }
   function append(view, event) {
+    if (event.newLine) delete view.lines[event.role];
     const subtitles = view.sessionSettings ? view.sessionSettings.subtitles : view.settings.get().subtitles;
     if (subtitles === 'off' || (subtitles !== 'both' && subtitles !== event.role)) return;
     if (!view.lines[event.role]) {
@@ -145,7 +150,7 @@
       (tutor ? '貼上教材，一起弄懂，再練習說出答案。' : '像打電話一樣，直接說出你想問的事。') +
       '</p></div></header><div class="model-row"><label for="model-' + mode + '">Gemini 3.8</label>' +
       '<select id="model-' + mode + '"><option value="gemini-3.8-live">一般版（Live）</option>' +
-      '<option value="gemini-3.8-live-extended-thinking">Extended Thinking</option></select>' +
+      '<option value="gemini-3.8-live-extended-thinking">Extended Thinking</option><option value="gpt-live-1">GPT-Live-1</option></select>' +
       '<button type="button" data-settings>對話設定</button>' +
       '<span class="note">切換模型後，按開始建立新對話。</span></div><div class="workspace">' +
       (tutor ? '<aside class="material"><h2><label for="material-tutor">這次要練習的教材</label></h2>' +
@@ -156,7 +161,7 @@
         '<button type="button" data-prompt="請根據教材出一道口頭練習題，等我回答後再給回饋，不要先公布答案。">出題練習</button></div>' : '') +
       '</div></div><footer><div class="status-wrap"><p class="status" role="status" aria-live="polite">' +
       (tutor ? '先貼上教材，再開始陪練' : '準備好就按開始對話') +
-      '</p><p class="note">開始後會將聲音' + (tutor ? '與教材' : '') + '送至 Gemini；僅手動試聽會暫存本機音檔。</p></div>' +
+      '</p><p class="note">開始後會將聲音' + (tutor ? '與教材' : '') + '送至選用的 AI 服務；僅手動試聽會暫存本機音檔。</p></div>' +
       '<div class="controls"><button type="button" class="primary" data-start>' + (tutor ? '開始陪練' : '開始對話') +
       '</button><button type="button" data-mute hidden>靜音</button><button type="button" class="stop" data-stop hidden>結束通話</button></div></footer>';
     shadow.appendChild(page);
@@ -215,7 +220,7 @@
       turn: () => { view.lines = {}; },
       ready: info => {
         controls(view, true, true);
-        if (!info.resumed && view.sessionSettings.autoGreeting === 'on') view.client.prompt(view.sessionSettings.opening);
+        if (!info.resumed && view.sessionSettings.provider !== 'openai' && view.sessionSettings.autoGreeting === 'on') view.client.prompt(view.sessionSettings.opening);
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },
       error: text => status(view, text, true),
@@ -232,7 +237,8 @@
       const scene = scenarios.current();
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
-      view.sessionSettings = scene.settings;
+      view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini' });
+      if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';
       view.model.value = scene.model;
       const options = { scenario: scene };
       view.version++;
@@ -241,7 +247,7 @@
       empty();
       controls(view, true, false);
       activity();
-      await view.client.start(() => ticket(options), view.feedback.select.value, view.sessionSettings);
+      await view.client.start(extra => scene.model === 'gpt-live-1' ? ticket(Object.assign({ scenario: scene }, extra), 'ai-openai-session') : ticket(options), view.feedback.select.value, view.sessionSettings);
       if (view.version === version && !view.client.run) controls(view, false, false);
     });
     view.stop.addEventListener('click', () => { end(view, '通話已結束；再次開始會建立新對話'); cancelPending(); });
@@ -290,7 +296,7 @@
       if (views.chat) {
         views.chat.model.value = scene.model;
         views.chat.settings.element.dispatchEvent(new Event('close'));
-        if (!views.chat.busy) views.chat.empty();
+        if (!views.chat.busy) { views.chat.capture.clear(); views.chat.empty(); }
       }
     } });
   views.chat = makeView('chat');

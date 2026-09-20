@@ -41,7 +41,7 @@
     header.querySelector('.sub').remove();
     header.querySelector('h1').textContent = view.mode === 'chat' ? 'AI 語音' : '教材陪練';
     const modelTag = document.createElement('span'); modelTag.className = 'model-tag'; heading.append(modelTag);
-    function modelLabel() { modelTag.textContent = view.model.value.endsWith('extended-thinking') ? 'Gemini · Thinking' : 'Gemini · Live'; }
+    function modelLabel() { modelTag.textContent = view.model.value === 'gpt-live-1' ? 'OpenAI · GPT-Live' : view.model.value.endsWith('extended-thinking') ? 'Gemini · Thinking' : 'Gemini · Live'; }
     modelLabel(); view.model.addEventListener('change', modelLabel); view.settings.element.addEventListener('close', modelLabel);
     const settingsButton = page.querySelector('[data-settings]');
     const modelRow = page.querySelector('.model-row');
