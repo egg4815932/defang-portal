@@ -17,11 +17,12 @@
     }
     function select(value) {
       voice = value;
-      find('[data-note-title]').textContent = value + ' 的備註';
+      find('[data-note-title]').textContent = label(value) + ' 的備註';
       input.value = Object.hasOwn(drafts, value) ? drafts[value] : original(value);
       status.textContent = pending ? '處理備註中…' : !loaded ? '請載入音色備註' : changed(value) ? '此音色備註尚未儲存' : '此音色備註已同步';
       controls();
     }
+    function label(value) { return value.startsWith('openai:') ? 'GPT-Live · ' + value.slice(7) : value; }
     input.addEventListener('input', event => {
       event.stopPropagation(); drafts[voice] = input.value; status.textContent = '此音色備註尚未儲存'; controls(); activity();
     });
@@ -45,7 +46,7 @@
         if (version !== generation) return;
         // 只更新本次音色，其他草稿保留原版本，避免覆蓋別的視窗更新。
         saved[key] = result.items.find(item => item.voice === key); delete drafts[key];
-        pending = false; select(voice); status.textContent = key + ' 備註已儲存至你的帳號';
+        pending = false; select(voice); status.textContent = label(key) + ' 備註已儲存至你的帳號';
       } catch (error) { if (version === generation) status.textContent = error.message; }
       finally { if (version === generation) { pending = false; controls(); } }
     };

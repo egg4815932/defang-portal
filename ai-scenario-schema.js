@@ -26,7 +26,18 @@ var DFAISchema = (function () {
     ['Sadachbia','男聲','有活力'], ['Sadaltager','男聲','博學感'], ['Sulafat','女聲','溫暖']
   ];
   choice('voice', '音色', '聲音與語言', voices.map(function (v) { return [v[0], v.join(' · ')]; }), 'Kore', '男聲／女聲與特色依 Google 官方分類，實際表現也會受語言、指令影響。');
-  choice('openaiVoice', 'GPT-Live 音色', '聲音與語言', ['marin', 'cedar', 'alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'quartz', 'ripple', 'vesper', 'willow', 'stone', 'gleam', 'meridian', 'bossa', 'tempo', 'beacon', 'delta', 'cinder'].map(function (v) { return [v, v]; }), 'marin', 'GPT-Live 專用音色；回應語言仍由下方語言設定引導。');
+  // OpenAI Live 官方表的聲音呈現與地域風格，2026-09-20；未公布者不憑名稱猜測。
+  var openaiVoices = ['marin', 'cedar', 'alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse'].map(function (v) {
+    return [v, '男女聲未標示', '風格未標示'];
+  }).concat([
+    ['quartz', '女聲', '澳洲英語口音'], ['ripple', '男聲', '澳洲英語口音'],
+    ['vesper', '男聲', '英國英語口音'], ['willow', '女聲', '愛爾蘭英語口音'],
+    ['stone', '男聲', '愛爾蘭英語口音'], ['gleam', '女聲', '北美英語口音'],
+    ['meridian', '男聲', '北美英語口音'], ['bossa', '女聲', '巴西葡萄牙語口音'],
+    ['tempo', '男聲', '巴西葡萄牙語口音'], ['beacon', '男聲', '菲律賓英語口音'],
+    ['delta', '女聲', '美國南方英語口音'], ['cinder', '男聲', '美國南方英語口音']
+  ]);
+  choice('openaiVoice', 'GPT-Live 音色', '聲音與語言', openaiVoices.map(function (v) { return [v[0], v.join(' · ')]; }), 'marin', '依 OpenAI 官方聲音呈現與口音標示；未標示代表官方未公布。溫柔、活潑等聽感可記在下方備註，中文表現請以試聽為準。Maple 是 ChatGPT 原生音色，目前不在 GPT-Live API 公開名單中。');
   choice('language', '回應語言', '聲音與語言', [['zh-TW', '台灣中文'], ['en-US', '美式英語'], ['en-GB', '英式英語'], ['ja', '日語'], ['ko', '韓語'], ['auto', '跟隨我說的語言'], ['custom', '自訂']], 'zh-TW', '以文字指令引導，不攔截模型音訊。');
   text('customLanguage', '自訂語言', '聲音與語言', '', 60, '選擇自訂語言時必填。');
   text('accent', '口音偏好', '聲音與語言', '', 60);
@@ -123,5 +134,5 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
-  return { fields: fields, voices: voices, normalize: normalize, instruction: instruction, defaults: defaults, migrate: migrate };
+  return { fields: fields, voices: voices, openaiVoices: openaiVoices, normalize: normalize, instruction: instruction, defaults: defaults, migrate: migrate };
 })();

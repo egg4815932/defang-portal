@@ -59,9 +59,8 @@
       input.dataset.setting = f.key; input.setAttribute('aria-label', f.label); wrap.append(input);
       if (f.hint) { const hint = document.createElement('small'); hint.textContent = f.hint; wrap.append(hint); }
       controls[f.key] = input; groups.get(f.group).append(wrap);
-      if (f.key === 'voice') {
+      if (f.key === 'voice' || f.key === 'openaiVoice') {
         wrap.className = 'wide'; groups.get(f.group).append(notes.element);
-        input.addEventListener('change', () => notes.select(input.value));
       }
     });
     function all() { return builtins.concat(items); }
@@ -75,8 +74,11 @@
     function updateInstruction() {
       const openai = model.value === 'gpt-live-1';
       find('[data-provider-note]').hidden = !openai;
-      controls.voice.closest('label').hidden = openai; notes.element.hidden = openai;
+      controls.voice.closest('label').hidden = openai;
       controls.openaiVoice.closest('label').hidden = !openai;
+      const activeVoice = openai ? controls.openaiVoice : controls.voice;
+      activeVoice.closest('label').after(notes.element);
+      notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
       try { find('[data-instruction]').textContent = S.instruction(read()); }
       catch (error) { find('[data-instruction]').textContent = error.message; }
@@ -92,7 +94,6 @@
       name.value = scene.name; model.value = scene.model; material.value = scene.material;
       S.fields.forEach(f => { controls[f.key].value = scene.settings[f.key]; if (output[f.key]) output[f.key].value = scene.settings[f.key]; });
       editingId = id || ''; revision = rev || 0; dirty = false;
-      notes.select(controls.voice.value);
       updateInstruction(); find('[data-delete]').disabled = !editingId || loading;
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
     }
