@@ -80,6 +80,11 @@
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
+      const teaching = controls.teaching.value;
+      const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
+      Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
+      ['questions', 'questionRule', 'teachingRule'].forEach(k => { controls[k].closest('label').hidden = teaching === 'off'; });
+      controls.questionRule.disabled = loading || output.questions.valueAsNumber === 0;
       try { find('[data-instruction]').textContent = S.instruction(read()); }
       catch (error) { find('[data-instruction]').textContent = error.message; }
       find('[data-count]').textContent = material.value.length.toLocaleString() + ' / ' + output.materialLimit.value + ' 字';
