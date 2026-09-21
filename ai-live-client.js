@@ -42,10 +42,16 @@
         run.context = new Context();
         // 啟動手勢內喚醒，但不讓尚未取得裝置時的 resume 卡住權限流程。
         run.context.resume().catch(() => {});
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: Object.assign({ channelCount: 1, echoCancellation: run.settings.echo !== 'off', noiseSuppression: run.settings.noiseSuppression !== 'off', autoGainControl: run.settings.autoGainControl !== 'off' },
-            { deviceId: deviceId ? { exact: deviceId } : { ideal: 'default' } })
-        });
+        const audio = { channelCount: 1, echoCancellation: run.settings.echo !== 'off', noiseSuppression: run.settings.noiseSuppression !== 'off', autoGainControl: run.settings.autoGainControl !== 'off', deviceId: { exact: deviceId || 'default' } };
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio }); }
+        catch (error) {
+          // 部分瀏覽器沒有 default 別名；僅此情況退回瀏覽器預設，手選裝置不可偷偷替換。
+          if (deviceId || error.name !== 'OverconstrainedError' || error.constraint !== 'deviceId') throw error;
+          if (!current()) return false;
+          delete audio.deviceId;
+          stream = await navigator.mediaDevices.getUserMedia({ audio });
+        }
         if (!current()) { stream.getTracks().forEach(track => track.stop()); return false; }
         run.stream = stream;
         run.context.resume().catch(() => {});

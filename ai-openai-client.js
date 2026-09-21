@@ -21,9 +21,18 @@
         const Context = root.AudioContext || root.webkitAudioContext;
         if (!Context || !root.RTCPeerConnection) throw new Error('此瀏覽器不支援 GPT-Live 語音，請更新瀏覽器');
         run.context = new Context(); run.context.resume().catch(() => {});
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: Object.assign({
+        const audio = Object.assign({
           channelCount: 1, echoCancellation: settings.echo !== 'off', noiseSuppression: settings.noiseSuppression !== 'off', autoGainControl: settings.autoGainControl !== 'off'
-        }, { deviceId: deviceId ? { exact: deviceId } : { ideal: 'default' } }) });
+        }, { deviceId: { exact: deviceId || 'default' } });
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio }); }
+        catch (error) {
+          // 部分瀏覽器沒有 default 別名；僅此情況退回瀏覽器預設，手選裝置不可偷偷替換。
+          if (deviceId || error.name !== 'OverconstrainedError' || error.constraint !== 'deviceId') throw error;
+          if (!current()) return false;
+          delete audio.deviceId;
+          stream = await navigator.mediaDevices.getUserMedia({ audio });
+        }
         if (!current()) { stream.getTracks().forEach(t => t.stop()); return false; }
         run.stream = stream;
         run.context.resume().catch(() => {});
