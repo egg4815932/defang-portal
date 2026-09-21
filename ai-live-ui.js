@@ -5,6 +5,8 @@
   const host = document.createElement('div');
   host.id = 'defangAI';
   host.hidden = true;
+  // Shadow DOM 的外部樣式不阻擋首屏；備齊前禁止露出未定尺寸的 SVG。
+  host.style.setProperty('display', 'none', 'important');
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
@@ -20,8 +22,14 @@
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
     embeddedCss.href = new URL('ai-live-embedded.css?v=20260920-5', assetBase).href; shadow.appendChild(embeddedCss);
   }
+  const stylesReady = Promise.all(Array.from(shadow.querySelectorAll('link')).map(link => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('AI 頁面樣式載入逾時，請重新整理後再試')), 20000);
+    link.onload = () => { clearTimeout(timer); resolve(); };
+    link.onerror = () => { clearTimeout(timer); reject(new Error('AI 頁面樣式載入失敗，請重新整理後再試')); };
+  }))).then(() => { host.style.removeProperty('display'); });
+  stylesReady.catch(() => {}); // 由開啟頁面的呼叫端顯示錯誤。
   document.body.appendChild(host);
-  let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0;
+  let peer = null, origin = '', nonce = '', current = null, sequence = 0, lastActivity = 0, openSequence = 0;
   const pending = new Map();
   const views = {};
 
@@ -115,6 +123,7 @@
     if (message) status(view, message);
   }
   function close() {
+    openSequence++;
     if (current) end(current, '通話已結束');
     current = null;
     cancelPending();
@@ -340,9 +349,13 @@
       if (!views[message.mode] || typeof message.nonce !== 'string' || message.nonce.length < 16) return;
       close();
       peer = event.source; origin = event.origin; nonce = message.nonce;
-      host.hidden = false;
-      switchView(message.mode);
-      post('ai-live-opened');
+      const opening = openSequence;
+      stylesReady.then(() => {
+        if (opening !== openSequence || peer !== event.source || nonce !== message.nonce) return;
+        host.hidden = false;
+        switchView(message.mode);
+        post('ai-live-opened');
+      }).catch(() => { if (opening === openSequence) close(); });
       return;
     }
     if (event.source !== peer || event.origin !== origin || message.nonce !== nonce) return;
@@ -378,6 +391,6 @@
   if (app) app.addEventListener('load', resetAll);
   if (embedded) {
     Object.values(views).forEach(view => { view.page.setAttribute('role', 'region'); view.page.removeAttribute('aria-modal'); });
-    embedded.mount({ open: mode => { host.hidden = false; switchView(mode); }, close, reset: resetAll });
+    embedded.mount({ ready: stylesReady, open: mode => { host.hidden = false; switchView(mode); }, close, reset: resetAll });
   }
 })();
