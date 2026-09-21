@@ -69,17 +69,17 @@
   .boot-lockup{position:relative;z-index:1;display:grid;justify-items:center;transform:translateY(-1.6vh);
     opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1)}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
-    opacity:0;filter:drop-shadow(0 10px 22px rgba(30,66,41,.08))}
+    opacity:0}
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
     background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
   .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
   /* 精品三拍：Logo → 中線微光 → 系統名稱舒展。 */
-  html.boot-brand-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) both}
+  html.boot-brand-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) backwards;opacity:1}
   html.boot-brand-ready .boot-rule{animation:boot-rule-glow .82s cubic-bezier(.22,.78,.28,1) 1.23s both}
   html.boot-brand-ready .boot-name{animation:boot-name-settle 1.06s cubic-bezier(.2,.72,.2,1) 1.94s both}
   @keyframes boot-logo-arrive{
     from{opacity:0;transform:translateY(9px)}
-    to{opacity:1;transform:translateY(0)}
+    to{opacity:1;transform:none}
   }
   @keyframes boot-rule-glow{
     from{opacity:0;transform:scaleX(.08);filter:drop-shadow(0 0 0 rgba(43,126,67,0))}
