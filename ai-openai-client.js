@@ -23,9 +23,10 @@
         run.context = new Context(); run.context.resume().catch(() => {});
         const stream = await navigator.mediaDevices.getUserMedia({ audio: Object.assign({
           channelCount: 1, echoCancellation: settings.echo !== 'off', noiseSuppression: settings.noiseSuppression !== 'off', autoGainControl: settings.autoGainControl !== 'off'
-        }, deviceId ? { deviceId: { exact: deviceId } } : {}) });
+        }, { deviceId: deviceId ? { exact: deviceId } : { ideal: 'default' } }) });
         if (!current()) { stream.getTracks().forEach(t => t.stop()); return false; }
         run.stream = stream;
+        run.context.resume().catch(() => {});
         const track = stream.getAudioTracks()[0];
         this.emit('device', { label: track.label || '系統預設麥克風', id: track.getSettings ? track.getSettings().deviceId : '' });
         track.onended = () => { if (current()) this.fail(run, '麥克風已中斷，請重新開始'); };
@@ -63,6 +64,7 @@
           if (!current()) return;
           if (data.type === 'session.started' && !run.ready) {
             clearTimeout(run.timeout); run.ready = true; track.enabled = !run.muted;
+            run.lastSound = Date.now(); run.context.resume().catch(() => {});
             this.emit('state', 'GPT-Live 已連線，可以開始說話'); this.emit('ready', { resumed: false });
           } else if (/^session\.(input|output)_transcript\.delta$/.test(data.type) && typeof data.delta === 'string') {
             const role = data.type.includes('input_') ? 'user' : 'model';
@@ -79,9 +81,19 @@
         run.monitor = setInterval(() => {
           if (!current()) return;
           const running = run.context.state === 'running';
-          this.emit('inputLevel', running && run.ready && !run.muted ? level(run.meter) : { level: 0, bands: [] });
+          const input = running && run.ready && !run.muted ? level(run.meter) : { level: 0, bands: [] };
+          if (input.level > 0.003) run.lastSound = Date.now();
+          this.emit('inputLevel', input);
           this.emit('outputLevel', running ? level(run.output) : { level: 0, bands: [] });
-          this.emit('inputState', run.muted ? 'muted' : !running ? 'paused' : track.muted ? 'blocked' : run.ready ? 'sending' : 'connecting');
+          const state = run.muted ? 'muted' : !running ? 'paused' : track.muted ? 'blocked' : !run.ready ? 'connecting' : Date.now() - run.lastSound > 8000 ? 'quiet' : 'sending';
+          this.emit('inputState', state);
+          if (run.ready && state !== run.audioState) {
+            run.audioState = state;
+            this.emit('state', state === 'paused' ? '音訊已暫停，請開啟「收音與試聽」恢復音訊' :
+              state === 'blocked' ? '麥克風被系統暫停，請檢查裝置或靜音鍵' :
+              state === 'quiet' ? '目前沒有收到你的聲音；若正在說話，請在「收音與試聽」更換麥克風' :
+              state === 'muted' ? '麥克風已靜音' : 'GPT-Live 已連線，可以開始說話');
+          }
         }, 80);
         this.emit('state', '正在連接 GPT-Live…');
         await pc.setLocalDescription(await pc.createOffer());
@@ -106,6 +118,8 @@
     mute(value) {
       const run = this.run; if (!run) return;
       run.muted = value;
+      run.lastSound = Date.now();
+      if (!value) this.resumeAudio();
       if (run.stream) run.stream.getAudioTracks().forEach(t => { t.enabled = run.ready && !value; });
       if (run.channel && run.channel.readyState === 'open') run.channel.send(JSON.stringify({ type: value ? 'session.input_audio.mute' : 'session.input_audio.unmute' }));
     }

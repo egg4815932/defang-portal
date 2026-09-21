@@ -44,7 +44,7 @@
         run.context.resume().catch(() => {});
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: Object.assign({ channelCount: 1, echoCancellation: run.settings.echo !== 'off', noiseSuppression: run.settings.noiseSuppression !== 'off', autoGainControl: run.settings.autoGainControl !== 'off' },
-            deviceId ? { deviceId: { exact: deviceId } } : {})
+            { deviceId: deviceId ? { exact: deviceId } : { ideal: 'default' } })
         });
         if (!current()) { stream.getTracks().forEach(track => track.stop()); return false; }
         run.stream = stream;
