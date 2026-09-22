@@ -9,7 +9,7 @@
   function BrainClient(ask, notify) {
     this.ask = ask; this.notify = notify || function () {};
     this.history = []; this.pending = null; this.busy = false;
-    this.timer = null; this.deadline = 0; this.seq = 0;
+    this.timer = null; this.deadline = 0; this.seq = 0; this.announced = false;
   }
   BrainClient.prototype.note = function (role, text, newLine) {
     if (typeof text !== 'string' || !text) return;
@@ -46,6 +46,9 @@
     this.ask({ action: 'brain', history: turns }).then(function (result) {
       var text = result && typeof result.text === 'string' ? result.text.trim() : '';
       if (!text) throw new Error('大腦沒有回覆內容');
+      // 第一次接上報一次型號：不然使用者無法分辨是大腦回的還是語音層自己講的。
+      if (!self.announced) { self.announced = true; self.notify('大腦已接上：' + (result.model || '未知模型')); }
+      if (result.searched > 0) self.notify('大腦查了網路（' + result.searched + ' 次搜尋）');
       // 使用者已經又說話了，這個答案就過期了，不要硬唸。
       if (self.pending) return;
       job.send({ type: 'session.commentary.append', event_id: 'brain_' + (++self.seq) + '_' + Date.now(), delegation_id: job.id, content: text });
@@ -59,7 +62,7 @@
   };
   BrainClient.prototype.reset = function () {
     clearTimeout(this.timer);
-    this.history = []; this.pending = null; this.busy = false; this.deadline = 0;
+    this.history = []; this.pending = null; this.busy = false; this.deadline = 0; this.announced = false;
   };
   root.DFBrainClient = BrainClient;
 })(typeof window !== 'undefined' ? window : globalThis);

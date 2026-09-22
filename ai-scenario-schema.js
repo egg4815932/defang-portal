@@ -84,7 +84,7 @@ var DFAISchema = (function () {
   choice('openaiBrain', '大腦模型', '模型與連線', [['gpt-5.6-luna', 'Luna · 快又便宜'], ['gpt-5.6-terra', 'Terra · ChatGPT App 同級'], ['gpt-6-astra', 'Astra · 旗艦推理，語音會變慢'], ['gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite · 走你的 Google 額度'], ['gemini-3.8-flash', 'Gemini 3.8 Flash · 走你的 Google 額度']], 'gpt-5.6-luna', '只適用 GPT-Live-1。一通 10 分鐘的大腦費用約 Luna US$0.03、Terra US$0.27、Astra US$1.30；語音層另計 US$0.05／分鐘。Astra 沒有「不思考」檔位。選 Gemini 時改由我們自己接大腦：思考程度不適用、字幕必須設為「雙方」，回話也會比 OpenAI 慢一點。');
   choice('openaiEffort', '大腦思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
   range('openaiMaxTokens', '大腦回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
-  choice('openaiWebSearch', '大腦網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路；每次搜尋約 US$0.01，查回來的內容另計 token。網路資料不等於公司規定。');
+  choice('openaiWebSearch', '大腦網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路：OpenAI 大腦每次搜尋約 US$0.01，Gemini 大腦改用 Google 搜尋接地、費用依你的 Google 方案。真的查了的時候畫面會說一聲。網路資料不等於公司規定。');
   choice('resumption', '斷線接回原對話', '模型與連線', onoff, 'on');
   choice('compression', '長對話自動整理', '模型與連線', onoff, 'on', '開啟後由 API 使用預設整理門檻。');
   range('reconnects', '最多重連次數', '模型與連線', 0, 5, 1, 2, '次');
