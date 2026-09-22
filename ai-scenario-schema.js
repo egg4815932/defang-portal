@@ -141,5 +141,20 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
-  return { fields: fields, voices: voices, openaiVoices: openaiVoices, normalize: normalize, instruction: instruction, defaults: defaults, migrate: migrate };
+  // 真正送到語音模型的那一份：後端固定補的段落也列在這裡，設定頁預覽與 GAS 共用同一個來源。
+  function delivery(scene) {
+    var s = scene.settings, openai = scene.model === 'gpt-live-1';
+    var parts = [{ text: instruction(scene), fixed: false }];
+    if (openai) {
+      parts.push({ text: '遇到需要推理、教材講解或判斷答案的問題，交由後端協助，再自然口語回答。', fixed: true });
+      parts.push({ text: s.autoGreeting === 'on' ? '連線後請主動回應這個開場要求：' + s.opening : '連線後先等待使用者說話，不主動開場。', fixed: true });
+    }
+    return {
+      parts: parts,
+      text: parts.map(function (p) { return p.text; }).join('\n'),
+      // system：開場白併在指令內；turn：新通話時另外當成使用者的一句話送出；none：不自動開場。
+      opening: s.autoGreeting !== 'on' ? 'none' : (openai ? 'system' : 'turn')
+    };
+  }
+  return { fields: fields, voices: voices, openaiVoices: openaiVoices, normalize: normalize, instruction: instruction, delivery: delivery, defaults: defaults, migrate: migrate };
 })();
