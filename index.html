@@ -72,20 +72,14 @@
      logo-brand.png 是非交錯 PNG（由上往下逐列解碼），瀏覽器在位元組還沒收完時
      就會把已有的掃描線畫出來。2026-09-23 可控重現：後半段位元組不送，畫面就是
      半顆紅心＋被削掉的字，而且此時 class 已經是 boot-brand-ready、opacity 已是 1。
-     所以 Logo 的任何可見度一律綁 html.boot-logo-ready（＝img.decode() 真的完成），
-     淡影呼吸也不例外 —— 淡影畫的是同一張半截圖，只是當下看不出來。 */
+     所以 Logo 的任何可見度一律綁 html.boot-logo-ready（＝img.decode() 真的完成）。 */
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     opacity:0}
-  /* 等 GAS 的那幾秒：Logo 只以淡影靜靜呼吸，中線與系統名一律不出現。
-     刻意停在 translateY(9px)＝三拍動畫的起點位置，內容備妥時就從這個位置亮起來接著飄升，
-     看起來是一條連續的線，不是「淡影」與「動畫」兩段。 */
-  html.boot-logo-ready:not(.boot-brand-ready):not(.app-ready) .boot-logo{
-    transform:translateY(9px);
-    animation:boot-logo-wake .9s cubic-bezier(.22,.78,.28,1) both,
-              boot-logo-breathe 3.8s ease-in-out .9s infinite
-  }
-  @keyframes boot-logo-wake{ from{opacity:0} to{opacity:.13} }
-  @keyframes boot-logo-breathe{ 0%,100%{opacity:.13} 50%{opacity:.19} }
+  /* 等 GAS 的那幾秒：畫面上只有薄荷底，Logo／中線／系統名一律不出現。
+     ⛔ 2026-09-23 使用者指示移除原本的「淡影呼吸」，不要再加回來：
+        它救不了半截 LOGO（淡影畫的是同一張沒收完的圖），又把啟動拆成
+        「淡影」與「三拍」兩段。等待期什麼都不給，才符合這頁一開始就寫的
+        「不加遮罩、假進度或等待動畫」。 */
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
     background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
   .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
@@ -93,9 +87,9 @@
   html.boot-brand-ready.boot-logo-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) backwards;opacity:1}
   html.boot-brand-ready .boot-rule{animation:boot-rule-glow .82s cubic-bezier(.22,.78,.28,1) 1.23s both}
   html.boot-brand-ready .boot-name{animation:boot-name-settle 1.06s cubic-bezier(.2,.72,.2,1) 1.94s both}
-  /* from 的 .13 必須等於呼吸動畫的低點：從淡影原地亮起，中間不會先消失再出現。 */
+  /* 淡影呼吸移除後，起點就是「完全沒有」；translateY(9px) 留著，飄升那一下才有東西可飄。 */
   @keyframes boot-logo-arrive{
-    from{opacity:.13;transform:translateY(9px)}
+    from{opacity:0;transform:translateY(9px)}
     to{opacity:1;transform:none}
   }
   @keyframes boot-rule-glow{
@@ -119,7 +113,6 @@
   html.app-ready .boot-backdrop{opacity:0}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
-    html.boot-logo-ready:not(.boot-brand-ready):not(.app-ready) .boot-logo{animation:none;opacity:.13;transform:translateY(9px)}
     html.boot-brand-ready.boot-logo-ready .boot-logo,
     html.boot-brand-ready .boot-rule,
     html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
@@ -252,8 +245,7 @@
 
 <script>
 /* viewport-ready 只負責安全區通道。啟動的視覺順序是「先等內容，再一次把品牌動畫跑完」：
-     ① 等待期：Logo 只以淡影呼吸（純 CSS，見上方 boot-logo-breathe），中線與系統名不出現
-        ⚠ 但「淡影」本身也要等 img.decode() 完成才准出現，否則呼吸的是一張半截圖
+     ① 等待期：只有薄荷底，Logo／中線／系統名一律不出現（2026-09-23 拿掉原本的淡影呼吸）
      ② logo 解碼完 ＋ iframe 完整 load ＋ GAS 回報分流完成 → 這時候才開跑三拍動畫
      ③ 三拍整段跑完 → 立刻交棒進 APP
    ⛔ 不可把三拍動畫綁回固定延遲（舊版綁版面穩定後 650ms）：那會讓動畫在 GAS 還沒回來時就跑完，
