@@ -33,7 +33,18 @@
     const picker = document.createElement('div'); picker.className = 'scenario-call-pickers'; picker.append(label, modelLabel);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
     const groups = new Map();
-    const notes = new window.DFAIVoiceNotes(hooks.notesRpc, hooks.activity);
+    const notes = new window.DFAIVoiceNotes(hooks.notesRpc, hooks.activity, () => voiceNames());
+    // 使用者取的名字蓋過官方標籤；沒取名就回到官方那一行。
+    function voiceNames() {
+      [['voice', ''], ['openaiVoice', 'openai:']].forEach(([key, prefix]) => {
+        if (!controls[key]) return;
+        const choices = S.fields.find(f => f.key === key).choices;
+        Array.from(controls[key].options).forEach((option, i) => {
+          const name = notes.alias(prefix + option.value);
+          option.text = name ? option.value + ' · ' + name : choices[i][1];
+        });
+      });
+    }
     S.fields.forEach(f => {
       if (!groups.has(f.group)) {
         const details = document.createElement('details'); details.className = 'scenario-group';

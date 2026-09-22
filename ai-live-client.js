@@ -46,9 +46,10 @@
         let stream;
         try { stream = await navigator.mediaDevices.getUserMedia({ audio }); }
         catch (error) {
-          // 部分瀏覽器沒有 default 別名；僅此情況退回瀏覽器預設，手選裝置不可偷偷替換。
-          if (deviceId || error.name !== 'OverconstrainedError' || error.constraint !== 'deviceId') throw error;
+          // 手選裝置不可偷偷替換；沒有手選時才退回瀏覽器預設，權限類錯誤不重試以免重複跳提示。
+          if (deviceId || error.name === 'NotAllowedError' || error.name === 'SecurityError') throw error;
           if (!current()) return false;
+          this.emit('state', '系統預設麥克風開不起來，改用瀏覽器預設再試［' + (error.name || '未知') + '］');
           delete audio.deviceId;
           stream = await navigator.mediaDevices.getUserMedia({ audio });
         }
@@ -143,7 +144,8 @@
         const message = error.name === 'NotAllowedError' ? '麥克風未開放，請在瀏覽器允許後重新開始' :
           error.name === 'NotFoundError' || error.name === 'OverconstrainedError' ? '找不到選擇的麥克風，請改選其他裝置' :
           error.name === 'NotReadableError' ? '麥克風無法開啟，請檢查系統麥克風權限或其他程式是否占用' : error.message;
-        this.fail(run, message || '連線失敗，請稍後再試');
+        // 名稱一定要留在畫面上：iOS Safari 常常只給名稱不給說明，實機回報才追得下去。
+        this.fail(run, (message || '連線失敗，請稍後再試') + (error.name ? '［' + error.name + '］' : ''));
         return false;
       }
     }

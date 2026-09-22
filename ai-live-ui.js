@@ -16,7 +16,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260920-2', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260920-7', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260922-2', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';

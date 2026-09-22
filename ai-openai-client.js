@@ -8,6 +8,13 @@
     samples.forEach((v, i) => { sum += v * v; const b = Math.min(23, Math.floor(i * 24 / samples.length)); bands[b] = Math.max(bands[b], Math.abs(v)); });
     return { level: Math.sqrt(sum / samples.length), bands };
   }
+  function describe(error) {
+    // iOS Safari 常常只給名稱不給說明；名稱一定要留在畫面上，實機回報才追得下去。
+    const name = error && error.name ? error.name : '';
+    const constraint = name === 'OverconstrainedError' && error.constraint ? '·' + error.constraint : '';
+    const text = error && error.message ? error.message : 'GPT-Live 連線失敗';
+    return name ? text + '［' + name + constraint + '］' : text;
+  }
   class OpenAILiveClient {
     constructor(callbacks) { this.callbacks = callbacks; this.run = null; }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
@@ -27,9 +34,10 @@
         let stream;
         try { stream = await navigator.mediaDevices.getUserMedia({ audio }); }
         catch (error) {
-          // 部分瀏覽器沒有 default 別名；僅此情況退回瀏覽器預設，手選裝置不可偷偷替換。
-          if (deviceId || error.name !== 'OverconstrainedError' || error.constraint !== 'deviceId') throw error;
+          // 手選裝置不可偷偷替換；沒有手選時才退回瀏覽器預設，權限類錯誤不重試以免重複跳提示。
+          if (deviceId || error.name === 'NotAllowedError' || error.name === 'SecurityError') throw error;
           if (!current()) return false;
+          this.emit('state', '系統預設麥克風開不起來，改用瀏覽器預設再試［' + (error.name || '未知') + '］');
           delete audio.deviceId;
           stream = await navigator.mediaDevices.getUserMedia({ audio });
         }
@@ -50,7 +58,14 @@
           if (!current()) return;
           const remote = event.streams[0] || new MediaStream([event.track]);
           // 遠端 WebRTC 音訊一定要有 <audio> 消費：只接 WebAudio 時 Chromium 與 iOS 都拿不到任何取樣。
-          if (!run.audio) { run.audio = new Audio(); run.audio.autoplay = true; run.audio.playsInline = true; }
+          if (!run.audio) {
+            run.audio = new Audio();
+            run.audio.autoplay = true; run.audio.playsInline = true; run.audio.setAttribute('playsinline', '');
+            run.audio.muted = false; run.audio.volume = 1;
+            // Android Chrome 會把沒掛進文件的 media element 當背景播放，聲音收不到。
+            run.audio.style.display = 'none';
+            (document.body || document.documentElement).appendChild(run.audio);
+          }
           run.audio.srcObject = remote;
           this.play(run);
           if (run.remote) run.remote.disconnect();
@@ -102,6 +117,15 @@
           if (input.level > 0.003) run.lastSound = Date.now();
           this.emit('inputLevel', input);
           this.emit('outputLevel', running ? level(run.output) : { level: 0, bands: [] });
+          if (run.audio && run.ready) {
+            const stalled = run.audio.paused || run.audio.muted || !run.audio.volume ? 'stopped' :
+              run.audio.currentTime === run.audioTime ? 'stalled' : 'playing';
+            run.audioTime = run.audio.currentTime;
+            if (stalled !== run.playState) {
+              run.playState = stalled;
+              if (stalled === 'stopped') { this.play(run); this.emit('state', '語音播放被停住了，正在重新播放'); }
+            }
+          }
           const state = run.muted ? 'muted' : !running ? 'paused' : track.muted ? 'blocked' : !run.ready ? 'connecting' : Date.now() - run.lastSound > 8000 ? 'quiet' : 'sending';
           this.emit('inputState', state);
           if (run.ready && state !== run.audioState) {
@@ -128,7 +152,7 @@
         await pc.setRemoteDescription({ type: 'answer', sdp: result.sdp });
         return current();
       } catch (error) {
-        if (current()) this.fail(run, error.name === 'NotAllowedError' ? '麥克風未開放，請允許後重新開始' : error.message || 'GPT-Live 連線失敗');
+        if (current()) this.fail(run, error.name === 'NotAllowedError' ? '麥克風未開放，請允許後重新開始' : describe(error));
         return false;
       }
     }
@@ -143,7 +167,7 @@
     play(run) {
       if (!run.audio) return;
       const attempt = run.audio.play();
-      if (attempt && attempt.catch) attempt.catch(() => { if (this.run === run) this.emit('state', '瀏覽器擋住了語音播放，請點一下畫面後按靜音再取消靜音'); });
+      if (attempt && attempt.catch) attempt.catch(error => { if (this.run === run) this.emit('state', '瀏覽器擋住了語音播放，請點一下畫面後按靜音再取消靜音［' + (error && error.name || '未知') + '］'); });
     }
     resumeAudio() { if (!this.run) return; this.run.context.resume().catch(() => {}); this.play(this.run); }
     prompt() { /* 開場只由後端已驗證情境設定一次，前端不能追加系統指令。 */ }
@@ -154,7 +178,7 @@
       this.run = null;
       clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer);
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
-      if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio = null; }
+      if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
       [run.input, run.meter, run.remote, run.output, run.silent].forEach(n => { if (n) n.disconnect(); });
       if (run.context) run.context.close().catch(() => {});
       this.emit('inputLevel', { level: 0, bands: [] }); this.emit('outputLevel', { level: 0, bands: [] }); this.emit('inputState', 'idle');
