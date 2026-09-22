@@ -15,8 +15,16 @@
 /* 心臟舞台 */
 .minimal .conversation{border:0;background:transparent;overflow:visible}
 .heart-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px}
-.heart{width:min(44vh,60vw,330px);height:auto;max-height:100%;overflow:visible;transform-origin:center;will-change:transform;filter:drop-shadow(0 14px 30px #e4001126)}
+.heart{width:min(60vh,80vw,500px);height:auto;max-height:100%;overflow:visible;transform-origin:center;will-change:transform;filter:grayscale(1) opacity(.42) drop-shadow(0 10px 22px #2c6a4014);transition:filter .45s ease}
+.minimal.call-live .heart{filter:drop-shadow(0 16px 34px #e4001130)}
 .heart-ecg{fill:none;stroke:#fff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* 剩餘時間：只在通話中出現，排在撥號鍵正上方。 */
+.call-clock{display:flex;align-items:baseline;justify-content:center;gap:10px;margin:0;font-variant-numeric:tabular-nums}
+.call-left{font-size:21px;font-weight:600;letter-spacing:.04em;color:#2f6b45;line-height:1.2}
+.call-clock.ending .call-left{color:#b3372f}
+.call-note{font-size:12px;color:#77947f}
+.minimal footer{padding-bottom:clamp(10px,5vh,54px)}
 
 /* 文字訊息：開啟時心臟讓位，關閉時完全不占空間。 */
 .minimal .transcript{display:none}
@@ -25,5 +33,5 @@
 .minimal.subtitles .heart{width:auto;height:100%}
 .minimal [data-subtitles][aria-pressed=true]{background:#d8efdf}
 
-@media(max-width:650px){.scenario-cards{gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.scenario-card{flex:0 1 150px;min-height:92px;padding:12px;font-size:15px;border-radius:18px}.heart{width:min(38vh,72vw,300px)}}
-@media(max-height:500px){.heart{width:min(46vh,40vw,220px)}.scenario-cards{gap:8px}.scenario-card{min-height:64px;padding:10px 14px;font-size:14px;flex:0 1 170px}}
+@media(max-width:650px){.scenario-cards{gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.scenario-card{flex:0 1 150px;min-height:92px;padding:12px;font-size:15px;border-radius:18px}.heart{width:min(52vh,90vw,400px)}.call-left{font-size:19px}.minimal footer{padding-bottom:clamp(8px,4vh,38px)}}
+@media(max-height:500px){.heart{width:min(52vh,42vw,250px)}.minimal footer{padding-bottom:6px}.call-clock{flex-direction:column;gap:0;align-items:center}.call-left{font-size:17px}.scenario-cards{gap:8px}.scenario-card{min-height:64px;padding:10px 14px;font-size:14px;flex:0 1 170px}}

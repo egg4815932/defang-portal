@@ -23,7 +23,7 @@
     embeddedCss.href = new URL('ai-live-embedded.css?v=20260920-5', assetBase).href; shadow.appendChild(embeddedCss);
   }
   const heartCss = document.createElement('link');
-  heartCss.rel = 'stylesheet'; heartCss.href = new URL('ai-live-heart.css?v=20260922-4', assetBase).href;
+  heartCss.rel = 'stylesheet'; heartCss.href = new URL('ai-live-heart.css?v=20260923-2', assetBase).href;
   shadow.appendChild(heartCss);
   const stylesReady = Promise.all(Array.from(shadow.querySelectorAll('link')).map(link => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('AI 頁面樣式載入逾時，請重新整理後再試')), 20000);
@@ -61,6 +61,19 @@
     pending.forEach(request => { clearTimeout(request.timer); request.reject(new Error('連線已取消')); });
     pending.clear();
   }
+  function callTick(view) {
+    const nudge = view.sessionNudge;
+    if (!view.callStartedAt || !nudge || view.nudgeSentAt) return;
+    if (Date.now() - view.callStartedAt < nudge.at) return;
+    if (!view.client.run || !view.client.run.ready) return;
+    view.nudgeSentAt = Date.now();
+    view.client.prompt(nudge.text);
+    // 提醒是以你的身分送出的一句話，字幕照既有規則顯示。
+    view.lines = {};
+    append(view, { role: 'user', text: nudge.text });
+    view.lines = {};
+    activity();
+  }
   function controls(view, active, ready) {
     view.busy = active;
     view.start.hidden = active;
@@ -83,7 +96,9 @@
     if (active) view.keepAlive = setInterval(() => {
       if (view.client.run && view.client.run.ready && !view.muted) activity();
     }, 15000);
-    if (!active) { view.mute.textContent = '靜音'; view.muted = false; }
+    clearInterval(view.callTimer);
+    if (active && !view.testing) view.callTimer = setInterval(() => callTick(view), 1000);
+    if (!active) { view.mute.textContent = '靜音'; view.muted = false; view.callStartedAt = 0; }
     if (view.compact) view.compact.refresh();
     if (view.manual) {
       view.manual.hidden = !active || view.testing || !view.sessionSettings || view.sessionSettings.automatic !== 'off';
@@ -182,7 +197,8 @@
       log: page.querySelector('.transcript'), status: page.querySelector('.status'),
       start: page.querySelector('[data-start]'), stop: page.querySelector('[data-stop]'),
       mute: page.querySelector('[data-mute]'), quick: Array.from(page.querySelectorAll('[data-prompt]')),
-      lines: {}, version: 0, busy: false, muted: false
+      lines: {}, version: 0, busy: false, muted: false,
+      callStartedAt: 0, callLimitMs: 0, nudgeSentAt: 0, sessionNudge: null
     };
     view.settings = new window.DFAISettings(mode, view.model);
     view.settings.get = () => scenarios.current().settings;
@@ -241,6 +257,7 @@
       text: event => append(view, event),
       turn: () => { view.lines = {}; },
       ready: info => {
+        if (!view.callStartedAt) view.callStartedAt = Date.now();
         controls(view, true, true);
         view.client.volume(volumePercent / 100);
         if (!info.resumed && view.sessionGreeting) view.client.prompt(view.sessionGreeting);
@@ -263,6 +280,12 @@
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini' });
       // turn＝Gemini 才要另外送開場白；沒打勾的情況 delivery 會回 none。
       view.sessionGreeting = window.DFAISchema.delivery(scene).opening === 'turn' ? scene.settings.opening : '';
+      // GPT-Live 的允許事件沒有插話這條，提醒稿只有 Gemini 送得出去。
+      const nudgeText = (scene.off || []).indexOf('nudgeText') < 0 ? scene.settings.nudgeText : '';
+      view.sessionNudge = view.sessionSettings.provider !== 'openai' && scene.settings.nudgeMinutes > 0 && nudgeText
+        ? { at: scene.settings.nudgeMinutes * 60000, text: nudgeText } : null;
+      view.callLimitMs = scene.settings.durationMinutes * 60000;
+      view.callStartedAt = 0; view.nudgeSentAt = 0;
       if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';
       view.model.value = scene.model;
       const options = { scenario: scene };

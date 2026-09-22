@@ -47,14 +47,15 @@
       pauseMs: 'api', interruption: 'api', thinking: 'api', openaiBrain: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
       automatic: 'api local', subtitles: 'api local', durationMinutes: 'api local',
       requireMaterial: 'local', materialLimit: 'local', echo: 'local', noiseSuppression: 'local',
-      autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local' };
+      autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local', nudgeMinutes: 'local' };
     const kindNotes = {
       automatic: '手動模式同時關掉 API 的自動偵測，並在對話頁顯示按鈕。',
       subtitles: 'API 決定要不要開轉錄，前端決定顯示誰的字幕。',
       durationMinutes: 'Gemini：票證到時間真的失效。GPT-Live：只是瀏覽器計時，不是帳單上限。',
       pacePercent: '滑桿只是寫進指令的數字，不是播放器倍速。',
       sentences: '滑桿只是寫進指令的數字，說到句數不會被切斷。',
-      questions: '滑桿只是寫進指令的數字，不是硬性題數。'
+      questions: '滑桿只是寫進指令的數字，不是硬性題數。',
+      nudgeMinutes: '瀏覽器自己計時，到點才把下面那句話送出去；只有 Gemini 支援。'
     };
     function badges(key) {
       return (kinds[key] || 'prompt').split(' ').map(kind => {
@@ -157,7 +158,7 @@
       const activeVoice = openai ? controls.openaiVoice : controls.voice;
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
-      ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
+      ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds', 'nudgeMinutes', 'nudgeText'].forEach(k => { controls[k].closest('label').hidden = openai; });
       ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       const teaching = switches.teaching.checked ? controls.teaching.value : 'off';
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };

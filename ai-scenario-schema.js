@@ -89,6 +89,8 @@ var DFAISchema = (function () {
   choice('compression', '長對話自動整理', '模型與連線', onoff, 'on', '開啟後由 API 使用預設整理門檻。');
   range('reconnects', '最多重連次數', '模型與連線', 0, 5, 1, 2, '次');
   range('durationMinutes', '通話／票證有效時間', '模型與連線', 1, 30, 1, 30, '分鐘');
+  range('nudgeMinutes', '通話到第幾分鐘送出提醒', '模型與連線', 0, 30, 1, 0, '分鐘', '0 表示不提醒。通話計時到這個分鐘數時，把下面那句話當成你說的一句話送給 AI，整通只送一次。設得比通話時間長就不會觸發；GPT-Live-1 不支援通話中插話，這兩格只對 Gemini 生效。');
+  text('nudgeText', '到時間要送出的話', '模型與連線', '', 500, '例如「請客氣地說你趕時間，開始收尾」。通話中才送出，不會寫進開場的系統指令；取消右邊的勾選就不送。');
   range('startSeconds', '取得票證後的開線期限', '模型與連線', 10, 60, 5, 60, '秒');
   range('timeoutSeconds', '單次連線等待上限', '模型與連線', 5, 60, 5, 20, '秒');
   range('requestsPerMinute', '每分鐘建立連線上限', '模型與連線', 1, 6, 1, 6, '次', '可設得更嚴格；每位員工最高 6 次。');
@@ -124,6 +126,7 @@ var DFAISchema = (function () {
     if (geminiBrains.indexOf(out.settings.openaiBrain) >= 0 && out.settings.subtitles !== 'both') throw new Error('Gemini 大腦要靠字幕重建對話內容，請把文字字幕設為「雙方」');
     if (out.settings.language === 'custom' && out.off.indexOf('language') < 0 && out.off.indexOf('customLanguage') < 0 && !out.settings.customLanguage) throw new Error('請填自訂語言');
     if (out.settings.autoGreeting === 'on' && out.off.indexOf('autoGreeting') < 0 && out.off.indexOf('opening') < 0 && !out.settings.opening) throw new Error('請填開場文字，或關閉自動開場');
+    if (out.settings.nudgeMinutes > 0 && out.off.indexOf('nudgeText') < 0 && !out.settings.nudgeText) throw new Error('請填到時間要送出的話，或把提醒時間點設為 0');
     if (out.material.length > out.settings.materialLimit) throw new Error('教材超過此情境的字數上限');
     if (JSON.stringify(out).length > 42000) throw new Error('情境內容合計請控制在 42,000 字以內');
     return out;

@@ -6,9 +6,11 @@
   // 一次心搏的 P-Q-R-S-T 形狀，一格一個取樣點；不說話時佇列是空的，線就是平的。
   const PULSE = [0.18, 0.06, -0.14, -0.3, 1, -0.44, 0.06, 0.24, 0.12];
   const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  // 兩段式收縮，接近實際心音的 lub-dub。
-  function beat(t) {
-    return Math.min(1, Math.exp(-Math.pow((t - 0.10) / 0.055, 2)) + 0.55 * Math.exp(-Math.pow((t - 0.27) / 0.075, 2)));
+  // AI 出聲時的收縮幅度；沒接通或沒出聲就停在原尺寸。
+  const SWELL = calm ? 0.08 : 0.30;
+  function clock(ms) {
+    const total = Math.round(ms / 1000);
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
   }
   window.DFAIHeart = function (view, compact) {
     const page = view.page;
@@ -68,9 +70,29 @@
     page.querySelector('.conversation').prepend(stage);
     const heart = stage.querySelector('.heart'), ecg = stage.querySelector('.heart-ecg');
 
+    const timer = document.createElement('p');
+    timer.className = 'call-clock';
+    timer.innerHTML = '<span class="call-left" role="timer" aria-live="off"></span><span class="call-note" role="status"></span>';
+    timer.hidden = true;
+    page.querySelector('.controls').before(timer);
+    const leftText = timer.querySelector('.call-left'), noteText = timer.querySelector('.call-note');
+    let shownLeft = '', shownNote = '', connected = false;
+    function showClock() {
+      const live = connected && view.callStartedAt && view.callLimitMs;
+      timer.hidden = !live;
+      if (!live) { shownLeft = shownNote = ''; return; }
+      const left = Math.max(0, view.callLimitMs - (Date.now() - view.callStartedAt));
+      const text = clock(left);
+      if (text !== shownLeft) { shownLeft = text; leftText.textContent = text; }
+      timer.classList.toggle('ending', left <= 60000);
+      const note = view.nudgeSentAt && Date.now() - view.nudgeSentAt < 6000 ? '已送出提醒'
+        : view.sessionNudge && !view.nudgeSentAt ? '第 ' + view.sessionNudge.at / 60000 + ' 分提醒' : '';
+      if (note !== shownNote) { shownNote = note; noteText.textContent = note; }
+    }
+
     // 只鏡射既有的振幅事件，原本的量表與心電圖各自讀同一份資料。
     const buffer = new Float32Array(POINTS);
-    let inputLevel = 0, outputLevel = 0, stamp = 0, phase = 0, last = 0, raf = 0;
+    let inputLevel = 0, outputLevel = 0, stamp = 0, pulse = 0, last = 0, raf = 0;
     let queue = [], cooldown = 0, amplitude = 0;
     const baseLevel = view.feedback.level.bind(view.feedback);
     view.feedback.level = function (kind, event) {
@@ -96,10 +118,12 @@
         path += 'L' + ((i / (POINTS - 1)) * SPAN).toFixed(1) + ' ' + (MID - buffer[i]).toFixed(1);
       }
       ecg.setAttribute('d', path);
-      const period = outputLevel > 0.02 ? 0.48 + (1 - outputLevel) * 0.34 : 1.25;
-      phase = (phase + delta / period) % 1;
-      const swell = calm ? 0.02 : 0.03 + outputLevel * 0.1;
-      heart.style.transform = 'scale(' + (1 + swell * beat(phase)).toFixed(4) + ')';
+      // 跟著 AI 的音量起伏：衝上去快、放掉慢，看起來才像被聲音推的。
+      const target = connected ? Math.min(1, outputLevel * 1.2) : 0;
+      const ease = 1 - Math.pow(1 - (target > pulse ? 0.45 : 0.10), delta * 60 || 1);
+      pulse += (target - pulse) * ease;
+      heart.style.transform = 'scale(' + (1 + pulse * SWELL).toFixed(4) + ')';
+      showClock();
       raf = requestAnimationFrame(frame);
     }
     function tick() {
@@ -110,7 +134,10 @@
     new MutationObserver(tick).observe(page, { attributes: true, attributeFilter: ['hidden'] });
 
     function apply() {
+      connected = !!(view.busy && !view.testing && view.client && view.client.run && view.client.run.ready);
       page.classList.toggle('picked', picked);
+      page.classList.toggle('call-live', connected);
+      showClock();
       tick();
     }
     apply();
