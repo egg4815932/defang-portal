@@ -77,6 +77,10 @@ var DFAISchema = (function () {
   text('listeningRule', '聽不清楚時的規則', '收音與接話', '只有背景雜音、呼吸、敲鍵盤或短暫安靜時，等待使用者說話，不要為此要求重說。能理解問題就直接回答，不要求整句重講。若只有一部分不清楚，只簡短確認那一部分；整句都無法辨識時，才請重說一次。');
   choice('subtitles', '文字字幕', '模型與連線', [['both', '雙方'], ['user', '只有我'], ['model', '只有 AI'], ['off', '關閉']], 'both');
   choice('thinking', '思考深度', '模型與連線', [['LOW', '低'], ['MEDIUM', '中'], ['HIGH', '高']], 'LOW', '只適用 Extended Thinking。');
+  // GPT-Live 專用：luna 的思考檔位與單次回答上限；兩項都在 delegation.responses 裡生效。
+  choice('openaiEffort', 'GPT-Live 思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
+  range('openaiMaxTokens', 'GPT-Live 單次回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
+  choice('openaiWebSearch', 'GPT-Live 網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路；每次搜尋約 US$0.01，查回來的內容另計 token。網路資料不等於公司規定。');
   choice('resumption', '斷線接回原對話', '模型與連線', onoff, 'on');
   choice('compression', '長對話自動整理', '模型與連線', onoff, 'on', '開啟後由 API 使用預設整理門檻。');
   range('reconnects', '最多重連次數', '模型與連線', 0, 5, 1, 2, '次');

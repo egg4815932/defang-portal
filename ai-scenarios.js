@@ -25,7 +25,7 @@
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
       '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre><p class="note" data-opening-note></p><p class="note instruction-off" data-instruction-off></p></details>' +
-      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。沒有搜尋或操作內部系統的工具；改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
+      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
     const find = sel => page.querySelector(sel), controls = {}, output = {};
     const name = find('[data-name]'), model = find('[data-model]'), material = find('[data-material]'), library = find('[data-library]');
@@ -44,7 +44,7 @@
       local: ['本機', '本機設定：只在你的瀏覽器或我們的後端生效，語音模型看不到。']
     };
     const kinds = { voice: 'api', openaiVoice: 'api', detection: 'api', endSensitivity: 'api', prefixMs: 'api',
-      pauseMs: 'api', interruption: 'api', thinking: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
+      pauseMs: 'api', interruption: 'api', thinking: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
       automatic: 'api local', subtitles: 'api local', durationMinutes: 'api local',
       requireMaterial: 'local', materialLimit: 'local', echo: 'local', noiseSuppression: 'local',
       autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local' };
@@ -152,6 +152,7 @@
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
+      ['openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { controls[k].closest('label').hidden = !openai; });
       const teaching = controls.teaching.value;
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
       Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
