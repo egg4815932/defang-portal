@@ -16,7 +16,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260922-3', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260922-5', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260922-9', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
@@ -243,7 +243,7 @@
       ready: info => {
         controls(view, true, true);
         view.client.volume(volumePercent / 100);
-        if (!info.resumed && view.sessionSettings.provider !== 'openai' && view.sessionSettings.autoGreeting === 'on') view.client.prompt(view.sessionSettings.opening);
+        if (!info.resumed && view.sessionGreeting) view.client.prompt(view.sessionGreeting);
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },
       error: text => status(view, text, true),
@@ -261,6 +261,8 @@
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini' });
+      // turn＝Gemini 才要另外送開場白；沒打勾的情況 delivery 會回 none。
+      view.sessionGreeting = window.DFAISchema.delivery(scene).opening === 'turn' ? scene.settings.opening : '';
       if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';
       view.model.value = scene.model;
       const options = { scenario: scene };

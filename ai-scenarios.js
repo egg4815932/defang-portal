@@ -88,8 +88,8 @@
       const wrap = document.createElement('label');
       const title = document.createElement('span'); title.className = 'field-title'; title.textContent = f.label;
       title.append(...badges(f.key));
-      // 沒打勾就整條關掉：欄位變灰、不能改，也不會出現在送出的指令裡。
-      if (f.toggle) {
+      // 標「指令」的每一格都給勾勾；沒打勾就整條關掉：欄位變灰、不能改，也不送出。
+      if (!kinds[f.key]) {
         const box = document.createElement('input'); box.type = 'checkbox'; box.checked = true; box.dataset.switch = f.key;
         box.setAttribute('aria-label', f.label + '：送出這條指令');
         const gate = document.createElement('span'); gate.className = 'field-switch';
@@ -115,7 +115,7 @@
         if (f.max > 60) wrap.className = 'wide';
       }
       input.dataset.setting = f.key; input.setAttribute('aria-label', f.label);
-      if (f.toggle) { input.id = 'scenario-field-' + f.key; wrap.htmlFor = input.id; }
+      if (switches[f.key]) { input.id = 'scenario-field-' + f.key; wrap.htmlFor = input.id; }
       wrap.append(input);
       if (f.hint) { const hint = document.createElement('small'); hint.textContent = f.hint; wrap.append(hint); }
       controls[f.key] = input; groups.get(f.group).append(wrap);
@@ -159,16 +159,17 @@
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
       ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
-      const teaching = controls.teaching.value;
+      const teaching = switches.teaching.checked ? controls.teaching.value : 'off';
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
       Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
       ['questions', 'questionRule', 'teachingRule'].forEach(k => { controls[k].closest('label').hidden = teaching === 'off'; });
       Object.keys(switches).forEach(key => {
         const on = switches[key].checked;
         controls[key].disabled = loading || !on;
+        if (output[key]) output[key].disabled = controls[key].disabled;
         controls[key].closest('label').classList.toggle('field-off', !on);
       });
-      controls.questionRule.disabled = loading || !switches.questionRule.checked || output.questions.valueAsNumber === 0;
+      controls.questionRule.disabled = loading || !switches.questionRule.checked || !switches.questions.checked || output.questions.valueAsNumber === 0;
       try { renderInstruction(read()); }
       catch (error) {
         find('[data-instruction]').textContent = error.message;
