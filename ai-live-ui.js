@@ -264,6 +264,7 @@
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },
       error: text => status(view, text, true),
+      record: payload => { ticket(payload, 'ai-call-record').catch(() => status(view, '本次通話記錄／錄音儲存失敗，不影響下次通話', true)); },
       activity: activity,
       inputLevel: event => view.feedback.level('input', event),
       inputPCM: event => view.capture.add(event),
@@ -277,7 +278,7 @@
       const scene = scenarios.current();
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
-      view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini' });
+      view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini', model: scene.model });
       // turn＝Gemini 才要另外送開場白；沒打勾的情況 delivery 會回 none。
       view.sessionGreeting = window.DFAISchema.delivery(scene).opening === 'turn' ? scene.settings.opening : '';
       // 到點提醒：Gemini 當成你說的一句話，GPT-Live 插一句應用指令。

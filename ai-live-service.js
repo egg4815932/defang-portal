@@ -2,7 +2,19 @@
 (function () {
   'use strict';
   const assets = new URL('.', document.currentScript.src);
-  let peer, origin, nonce, client, runId = 0, ticketWait = null;
+  let peer, origin, nonce, client, runId = 0, ticketWait = null, recorder = null;
+  function finalizeRecording(id, bindNonce) {
+    if (!recorder) return;
+    const rec = recorder; recorder = null;
+    rec.finish().then(result => {
+      if (!result.blob) return null;
+      return window.DFCallRecorderEncode(result.blob).then(base64 => Object.assign(result, { audio: base64 }));
+    }).then(result => {
+      if (!result) return;
+      delete result.blob;
+      if (id === runId && nonce === bindNonce) send('callback', { runId: id, name: 'record', value: result });
+    }).catch(() => {});
+  }
   function trusted(event) {
     const frame = document.querySelector('#appFrameViewport > iframe');
     if (!frame || !/^https:\/\/(?:[a-z0-9-]+-)?script\.googleusercontent\.com$/.test(event.origin)) return false;
@@ -26,6 +38,7 @@
   function stop() {
     if (ticketWait) { clearTimeout(ticketWait.timer); ticketWait.reject(new Error('連線已取消')); ticketWait = null; }
     if (client) client.stop();
+    finalizeRecording(runId, nonce);
   }
   function reset() { stop(); peer = null; origin = ''; nonce = ''; client = null; }
   window.addEventListener('message', async event => {
@@ -51,12 +64,21 @@
       stop(); runId = m.runId;
       const id = runId, bindNonce = nonce;
       let begun = false;
+      const model = (m.settings && m.settings.model) || '';
       const callbacks = {};
       ['state', 'device', 'inputLevel', 'inputPCM', 'outputLevel', 'inputState', 'ready', 'ended', 'error', 'text', 'turn', 'activity'].forEach(name => {
         callbacks[name] = value => {
           if (name === 'ended' && !begun) return;
           if (name === 'state') begun = true;
+          if (name === 'ready' && !m.testing && window.DFCallRecorder && id === runId && bindNonce === nonce) {
+            const run = client && client.run;
+            recorder = new window.DFCallRecorder(model);
+            if (!run || !run.context || !run.input || !run.volume || !recorder.attach(run.context, run.input, run.volume)) recorder = null;
+          }
+          if (name === 'text' && recorder) recorder.text(value);
+          if (name === 'outputLevel' && recorder) recorder.outputLevel(value.level);
           if (id === runId && nonce === bindNonce) send('callback', { runId: id, name, value, run: snapshot() });
+          if (name === 'ended') finalizeRecording(id, bindNonce);
         };
       });
       const Client = !m.testing && m.settings && m.settings.provider === 'openai' ? window.DFOpenAILiveClient : window.DFLiveClient;
@@ -79,7 +101,7 @@
       const waiting = ticketWait; ticketWait = null; clearTimeout(waiting.timer);
       if (m.error) waiting.reject(new Error(m.error)); else waiting.resolve(m.ticket);
     } else if (m.command === 'stop') stop();
-    else if (m.command === 'mute') { client.mute(!!m.value); send('run', { runId, run: snapshot() }); }
+    else if (m.command === 'mute') { client.mute(!!m.value); if (recorder) recorder.mute(!!m.value); send('run', { runId, run: snapshot() }); }
     else if (m.command === 'prompt' && typeof m.text === 'string') client.prompt(m.text);
     else if (m.command === 'resumeAudio') client.resumeAudio();
     else if (m.command === 'volume' && client.volume) client.volume(m.value);
