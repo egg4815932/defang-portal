@@ -24,10 +24,10 @@
       '<span><span class="field-badge badge-prompt">指令</span>串成文字唸給模型，盡量照做</span>' +
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
       '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
-      '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre><p class="note" data-opening-note></p><p class="note instruction-off" data-instruction-off></p></details>' +
+      '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
       '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
-    const find = sel => page.querySelector(sel), controls = {}, output = {};
+    const find = sel => page.querySelector(sel), controls = {}, output = {}, switches = {};
     const name = find('[data-name]'), model = find('[data-model]'), material = find('[data-material]'), library = find('[data-library]');
     const selector = document.createElement('select'); selector.dataset.scenario = ''; selector.setAttribute('aria-label', '套用情境');
     const label = document.createElement('label'); label.className = 'scenario-picker'; label.append(document.createTextNode('情境'), selector);
@@ -87,7 +87,18 @@
       }
       const wrap = document.createElement('label');
       const title = document.createElement('span'); title.className = 'field-title'; title.textContent = f.label;
-      title.append(...badges(f.key)); wrap.append(title);
+      title.append(...badges(f.key));
+      // 沒打勾就整條關掉：欄位變灰、不能改，也不會出現在送出的指令裡。
+      if (f.toggle) {
+        const box = document.createElement('input'); box.type = 'checkbox'; box.checked = true; box.dataset.switch = f.key;
+        box.setAttribute('aria-label', f.label + '：送出這條指令');
+        const gate = document.createElement('span'); gate.className = 'field-switch';
+        gate.title = '打勾才會送出這條指令；沒打勾會變灰色，不能編輯。';
+        gate.append(box, document.createTextNode('送出'));
+        gate.onclick = event => { if (event.target !== box && !box.disabled) box.click(); };
+        title.append(gate); switches[f.key] = box;
+      }
+      wrap.append(title);
       let input;
       if (f.type === 'select') {
         input = document.createElement('select'); f.choices.forEach(p => input.add(new Option(p[1], p[0])));
@@ -103,7 +114,9 @@
         input = document.createElement('textarea'); input.rows = f.max <= 60 ? 1 : 3; input.maxLength = f.max;
         if (f.max > 60) wrap.className = 'wide';
       }
-      input.dataset.setting = f.key; input.setAttribute('aria-label', f.label); wrap.append(input);
+      input.dataset.setting = f.key; input.setAttribute('aria-label', f.label);
+      if (f.toggle) { input.id = 'scenario-field-' + f.key; wrap.htmlFor = input.id; }
+      wrap.append(input);
       if (f.hint) { const hint = document.createElement('small'); hint.textContent = f.hint; wrap.append(hint); }
       controls[f.key] = input; groups.get(f.group).append(wrap);
       if (f.key === 'voice' || f.key === 'openaiVoice') {
@@ -116,14 +129,10 @@
     function read() {
       const settings = {};
       S.fields.forEach(f => { settings[f.key] = f.type === 'range' ? output[f.key].valueAsNumber : controls[f.key].value; });
-      return S.normalize({ name: name.value, model: model.value, material: material.value, settings });
+      const off = Object.keys(switches).filter(key => !switches[key].checked);
+      return S.normalize({ name: name.value, model: model.value, material: material.value, settings, off });
     }
     // 預覽必須跟後端送出的字串同源：標底色的段落是後端固定補的，情境改不到。
-    const openingNotes = {
-      none: '沒有自動開場：連線後等你先說話。',
-      system: '開場白已經包在上面的指令裡，GPT-Live 不另外送訊息。',
-      turn: '開場白另外送：新通話時當成你說的第一句話送出，接回原對話不重送。'
-    };
     function renderInstruction(scene) {
       const plan = S.delivery(scene), pre = find('[data-instruction]'), fixed = plan.parts.some(p => p.fixed);
       pre.replaceChildren();
@@ -139,9 +148,6 @@
         ? '對話頁本次通話模型選的是「' + label(callModel.value) + '」，真正通話會照那個模型的版本送出。' : '';
       find('[data-instruction-note]').textContent = '本次模型：' + label(scene.model) +
         '。下面就是語音模型收到的完整系統指令' + (fixed ? '；標底色那幾行是後端固定補的，情境改不到。' : '，這個模型沒有後端另外補的段落。') + override;
-      find('[data-opening-note]').textContent = openingNotes[plan.opening];
-      const missing = S.fields.filter(f => f.type === 'text' && f.value && !controls[f.key].value.trim() && !controls[f.key].closest('label').hidden).map(f => f.label);
-      find('[data-instruction-off]').textContent = missing.length ? '你清空了這幾條，這次不會送出：' + missing.join('、') : '';
     }
     function updateInstruction() {
       const openai = model.value === 'gpt-live-1';
@@ -152,16 +158,21 @@
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
-      ['openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { controls[k].closest('label').hidden = !openai; });
+      ['openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       const teaching = controls.teaching.value;
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
       Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
       ['questions', 'questionRule', 'teachingRule'].forEach(k => { controls[k].closest('label').hidden = teaching === 'off'; });
-      controls.questionRule.disabled = loading || output.questions.valueAsNumber === 0;
+      Object.keys(switches).forEach(key => {
+        const on = switches[key].checked;
+        controls[key].disabled = loading || !on;
+        controls[key].closest('label').classList.toggle('field-off', !on);
+      });
+      controls.questionRule.disabled = loading || !switches.questionRule.checked || output.questions.valueAsNumber === 0;
       try { renderInstruction(read()); }
       catch (error) {
         find('[data-instruction]').textContent = error.message;
-        ['[data-instruction-note]', '[data-opening-note]', '[data-instruction-off]'].forEach(sel => { find(sel).textContent = ''; });
+        find('[data-instruction-note]').textContent = '';
       }
       find('[data-count]').textContent = material.value.length.toLocaleString() + ' / ' + output.materialLimit.value + ' 字';
       controls.thinking.disabled = loading || model.value !== 'gemini-3.8-live-extended-thinking';
@@ -174,6 +185,7 @@
     function fill(scene, id, rev) {
       name.value = scene.name; model.value = scene.model; material.value = scene.material;
       S.fields.forEach(f => { controls[f.key].value = scene.settings[f.key]; if (output[f.key]) output[f.key].value = scene.settings[f.key]; });
+      Object.keys(switches).forEach(key => { switches[key].checked = (scene.off || []).indexOf(key) < 0; });
       editingId = id || ''; revision = rev || 0; dirty = false;
       updateInstruction(); find('[data-delete]').disabled = !editingId || loading;
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
