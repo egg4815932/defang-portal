@@ -68,9 +68,9 @@
     if (!view.client.run || !view.client.run.ready) return;
     view.nudgeSentAt = Date.now();
     view.client.prompt(nudge.text);
-    // 提醒是以你的身分送出的一句話，字幕照既有規則顯示。
+    // 字幕裡標一下，免得看起來像使用者自己講的。
     view.lines = {};
-    append(view, { role: 'user', text: nudge.text });
+    append(view, { role: 'user', text: '（到點提醒）' + nudge.text });
     view.lines = {};
     activity();
   }
@@ -280,10 +280,12 @@
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini' });
       // turn＝Gemini 才要另外送開場白；沒打勾的情況 delivery 會回 none。
       view.sessionGreeting = window.DFAISchema.delivery(scene).opening === 'turn' ? scene.settings.opening : '';
-      // GPT-Live 的允許事件沒有插話這條，提醒稿只有 Gemini 送得出去。
+      // 到點提醒：Gemini 當成你說的一句話，GPT-Live 插一句應用指令。
+      // nudgeReady 要跟後端開的白名單一致，client 端才知道這條事件能不能送。
       const nudgeText = (scene.off || []).indexOf('nudgeText') < 0 ? scene.settings.nudgeText : '';
-      view.sessionNudge = view.sessionSettings.provider !== 'openai' && scene.settings.nudgeMinutes > 0 && nudgeText
+      view.sessionNudge = scene.settings.nudgeMinutes > 0 && nudgeText
         ? { at: scene.settings.nudgeMinutes * 60000, text: nudgeText } : null;
+      view.sessionSettings.nudgeReady = !!view.sessionNudge;
       view.callLimitMs = scene.settings.durationMinutes * 60000;
       view.callStartedAt = 0; view.nudgeSentAt = 0;
       if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';

@@ -55,7 +55,7 @@
       pacePercent: '滑桿只是寫進指令的數字，不是播放器倍速。',
       sentences: '滑桿只是寫進指令的數字，說到句數不會被切斷。',
       questions: '滑桿只是寫進指令的數字，不是硬性題數。',
-      nudgeMinutes: '瀏覽器自己計時，到點才把下面那句話送出去；只有 Gemini 支援。'
+      nudgeMinutes: '瀏覽器自己計時，到點才把下面那句話送出去。Gemini 當成你說的話，GPT-Live 插一句應用指令。'
     };
     function badges(key) {
       return (kinds[key] || 'prompt').split(' ').map(kind => {
@@ -158,7 +158,7 @@
       const activeVoice = openai ? controls.openaiVoice : controls.voice;
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
-      ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds', 'nudgeMinutes', 'nudgeText'].forEach(k => { controls[k].closest('label').hidden = openai; });
+      ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
       ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       const teaching = switches.teaching.checked ? controls.teaching.value : 'off';
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };

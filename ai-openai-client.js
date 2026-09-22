@@ -109,6 +109,8 @@
             if (role === 'model' && !run.speakAt) run.speakAt = Date.now();
             if (run.brain) run.brain.note(role, data.delta, newLine);
             this.emit('text', { role, text: data.delta, newLine }); this.emit('activity');
+          } else if (data.type === 'session.instructions.appended') {
+            this.emit('activity');
           } else if (data.type === 'session.delegation.created' && run.brain) {
             run.brain.request(data.delegation && data.delegation.id, payload => {
               if (dc.readyState === 'open') dc.send(JSON.stringify(payload));
@@ -196,7 +198,16 @@
       if (this.run) this.applyVolume(this.run);
     }
     resumeAudio() { if (!this.run) return; this.run.context.resume().catch(() => {}); this.play(this.run); }
-    prompt() { /* 開場只由後端已驗證情境設定一次，前端不能追加系統指令。 */ }
+    // 到點提醒：插一句應用指令，語音層與被委派的大腦都收得到。
+    // 沒設提醒的情境，後端不會把這條事件放進白名單，送出去只會換來 error，所以先擋住。
+    prompt(text) {
+      const run = this.run;
+      if (!run || !run.ready || !(run.settings || {}).nudgeReady) return;
+      if (typeof text !== 'string' || !text.trim()) return;
+      if (!run.channel || run.channel.readyState !== 'open') return;
+      run.channel.send(JSON.stringify({ type: 'session.instructions.append',
+        event_id: 'nudge_' + Date.now(), delegation_id: null, content: text }));
+    }
     manualTurn() { return false; }
     fail(run, message) { if (this.run !== run) return; this.stop(); this.emit('ended'); this.emit('error', message); }
     stop() {
