@@ -19,7 +19,11 @@
       '<div class="scenario-editor"><div class="scenario-basics"><label>情境名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
       '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label></div>' +
       '<p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
-      '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label>一起儲存的教材<textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
+      '<div class="scenario-legend">每格的標記：' +
+      '<span><span class="field-badge badge-api">API</span>送進連線設定，一定照做</span>' +
+      '<span><span class="field-badge badge-prompt">指令</span>串成文字唸給模型，盡量照做</span>' +
+      '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
+      '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre><p class="note" data-opening-note></p><p class="note instruction-off" data-instruction-off></p></details>' +
       '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。沒有搜尋或操作內部系統的工具；改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
@@ -33,6 +37,34 @@
     const picker = document.createElement('div'); picker.className = 'scenario-call-pickers'; picker.append(label, modelLabel);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
     const groups = new Map();
+    // 每格走哪條路：api＝打包進連線設定，prompt＝串成文字唸給模型，local＝只在瀏覽器／後端生效。
+    const kindText = {
+      api: ['API', 'API 參數：打包進連線設定送出，機器層級一定照做。'],
+      prompt: ['指令', '文字指令：串成一段話唸給模型聽，它會盡量照做，但不保證。'],
+      local: ['本機', '本機設定：只在你的瀏覽器或我們的後端生效，語音模型看不到。']
+    };
+    const kinds = { voice: 'api', openaiVoice: 'api', detection: 'api', endSensitivity: 'api', prefixMs: 'api',
+      pauseMs: 'api', interruption: 'api', thinking: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
+      automatic: 'api local', subtitles: 'api local', durationMinutes: 'api local',
+      requireMaterial: 'local', materialLimit: 'local', echo: 'local', noiseSuppression: 'local',
+      autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local' };
+    const kindNotes = {
+      automatic: '手動模式同時關掉 API 的自動偵測，並在對話頁顯示按鈕。',
+      subtitles: 'API 決定要不要開轉錄，前端決定顯示誰的字幕。',
+      durationMinutes: 'Gemini：票證到時間真的失效。GPT-Live：只是瀏覽器計時，不是帳單上限。',
+      pacePercent: '滑桿只是寫進指令的數字，不是播放器倍速。',
+      sentences: '滑桿只是寫進指令的數字，說到句數不會被切斷。',
+      questions: '滑桿只是寫進指令的數字，不是硬性題數。'
+    };
+    function badges(key) {
+      return (kinds[key] || 'prompt').split(' ').map(kind => {
+        const tag = document.createElement('span');
+        tag.className = 'field-badge badge-' + kind;
+        tag.textContent = kindText[kind][0];
+        tag.title = kindText[kind][1] + (kindNotes[key] ? ' ' + kindNotes[key] : '');
+        return tag;
+      });
+    }
     const notes = new window.DFAIVoiceNotes(hooks.notesRpc, hooks.activity, () => voiceNames());
     // 使用者取的名字蓋過官方標籤；沒取名就回到官方那一行。
     function voiceNames() {
@@ -53,7 +85,9 @@
         if (!groups.size) details.open = true;
         find('[data-groups]').append(details); groups.set(f.group, grid);
       }
-      const wrap = document.createElement('label'); wrap.textContent = f.label;
+      const wrap = document.createElement('label');
+      const title = document.createElement('span'); title.className = 'field-title'; title.textContent = f.label;
+      title.append(...badges(f.key)); wrap.append(title);
       let input;
       if (f.type === 'select') {
         input = document.createElement('select'); f.choices.forEach(p => input.add(new Option(p[1], p[0])));

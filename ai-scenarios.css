@@ -27,3 +27,10 @@
 @media(max-width:750px){.scenario-layout{display:flex;flex-direction:column;gap:10px}.scenario-library{flex:none;padding:12px;gap:8px;overflow:visible}.scenario-library>.note,.scenario-library>details{font-size:12px}.scenario-actions{display:flex;flex-wrap:wrap}.scenario-actions button{flex:1;padding:6px;font-size:13px}.scenario-editor{flex:1}.scenario-basics,.scenario-grid{grid-template-columns:1fr}.scenario-page>header{flex-wrap:wrap}.scenario-page h1{font-size:20px}.scenario-page>header>button{font-size:12px;padding:8px}.scenario-footer{flex-wrap:wrap;gap:8px}.scenario-footer [data-message]{flex-basis:100%}.scenario-footer button{flex:1;font-size:13px;padding:8px}.scenario-group{padding-left:12px;padding-right:12px}.scenario-page .sub{font-size:12px}}
 
 .scenario-call-pickers{display:grid;gap:8px;width:100%;max-width:1200px;margin:0 auto}.scenario-grid label[hidden],.voice-notes[hidden]{display:none}
+.field-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.field-badge{font-size:11px;line-height:1;padding:3px 6px;border-radius:6px;font-weight:700;letter-spacing:.3px;cursor:help;white-space:nowrap}
+.badge-api{background:#2b7e43;color:#fff}
+.badge-prompt{background:#f3e0bd;color:#82520b}
+.badge-local{background:#dde6e0;color:#48674f}
+.scenario-legend{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 4px 14px;font-size:12px;color:#5c8065}
+.scenario-legend>span{display:inline-flex;align-items:center;gap:5px}
