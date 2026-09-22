@@ -16,7 +16,7 @@
     return name ? text + '［' + name + constraint + '］' : text;
   }
   class OpenAILiveClient {
-    constructor(callbacks) { this.callbacks = callbacks; this.run = null; }
+    constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.gain = 1; }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
     async start(getTicket, deviceId, settings) {
       this.stop();
@@ -49,10 +49,13 @@
         track.onended = () => { if (current()) this.fail(run, '麥克風已中斷，請重新開始'); };
         run.input = run.context.createMediaStreamSource(stream);
         run.meter = run.context.createAnalyser(); run.meter.fftSize = 1024; run.input.connect(run.meter);
-        // 出聲交給 <audio>；analyser 只做音波，仍需下游才會被驅動，所以用 0 音量接 destination。
+        // Apple 的 WebAudio 對遠端音軌不可靠，由 <audio> 出聲；其餘平台走 WebAudio，音量才能放大到系統上限以上。
+        run.viaElement = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        // analyser 放在音量之前：音波反映 AI 實際在說話，不隨滑桿變平。
         run.output = run.context.createAnalyser(); run.output.fftSize = 1024;
-        run.silent = run.context.createGain(); run.silent.gain.value = 0;
-        run.output.connect(run.silent); run.silent.connect(run.context.destination);
+        run.volume = run.context.createGain();
+        run.output.connect(run.volume); run.volume.connect(run.context.destination);
+        this.applyVolume(run);
         const pc = run.pc = new RTCPeerConnection();
         pc.ontrack = event => {
           if (!current()) return;
@@ -61,11 +64,12 @@
           if (!run.audio) {
             run.audio = new Audio();
             run.audio.autoplay = true; run.audio.playsInline = true; run.audio.setAttribute('playsinline', '');
-            run.audio.muted = false; run.audio.volume = 1;
+            run.audio.muted = false;
             // Android Chrome 會把沒掛進文件的 media element 當背景播放，聲音收不到。
             run.audio.style.display = 'none';
             (document.body || document.documentElement).appendChild(run.audio);
           }
+          this.applyVolume(run);
           run.audio.srcObject = remote;
           this.play(run);
           if (run.remote) run.remote.disconnect();
@@ -102,6 +106,7 @@
             const role = data.type.includes('input_') ? 'user' : 'model';
             const newLine = Number.isFinite(run.times[role]) && data.start_ms - run.times[role] > 1800;
             run.times[role] = data.end_ms;
+            if (role === 'model' && !run.speakAt) run.speakAt = Date.now();
             this.emit('text', { role, text: data.delta, newLine }); this.emit('activity');
           } else if (data.type === 'error') {
             const code = data.error && data.error.code;
@@ -109,6 +114,7 @@
           }
         };
         dc.onclose = () => { if (current()) this.fail(run, 'GPT-Live 通話通道已關閉'); };
+        run.startedAt = Date.now();
         run.timeout = setTimeout(() => this.fail(run, 'GPT-Live 連線逾時，已停止收音'), 60000);
         run.monitor = setInterval(() => {
           if (!current()) return;
@@ -116,7 +122,14 @@
           const input = running && run.ready && !run.muted ? level(run.meter) : { level: 0, bands: [] };
           if (input.level > 0.003) run.lastSound = Date.now();
           this.emit('inputLevel', input);
-          this.emit('outputLevel', running ? level(run.output) : { level: 0, bands: [] });
+          const out = running ? level(run.output) : { level: 0, bands: [] };
+          if (out.level > 0.0005) run.heard = true;
+          this.emit('outputLevel', out);
+          if (!run.viaElement && !run.heard && run.ready &&
+              (run.speakAt && Date.now() - run.speakAt > 2500 || Date.now() - run.startedAt > 20000)) {
+            run.viaElement = true; this.applyVolume(run); this.play(run);
+            this.emit('state', 'WebAudio 取不到這支裝置的語音，已改用系統音量播放');
+          }
           if (run.audio && run.ready) {
             const stopped = run.audio.paused || run.audio.muted || !run.audio.volume;
             if (stopped !== run.audioStopped) {
@@ -128,9 +141,9 @@
           this.emit('inputState', state);
           if (run.ready && state !== run.audioState) {
             run.audioState = state;
-            this.emit('state', state === 'paused' ? '音訊已暫停，請開啟「收音與試聽」恢復音訊' :
+            this.emit('state', state === 'paused' ? '音訊已暫停，請開啟「收音與播放」恢復音訊' :
               state === 'blocked' ? '麥克風被系統暫停，請檢查裝置或靜音鍵' :
-              state === 'quiet' ? '目前沒有收到你的聲音；若正在說話，請在「收音與試聽」更換麥克風' :
+              state === 'quiet' ? '目前沒有收到你的聲音；若正在說話，請在「收音與播放」更換麥克風' :
               state === 'muted' ? '麥克風已靜音' : 'GPT-Live 已連線，可以開始說話');
           }
         }, 80);
@@ -167,6 +180,14 @@
       const attempt = run.audio.play();
       if (attempt && attempt.catch) attempt.catch(error => { if (this.run === run) this.emit('state', '瀏覽器擋住了語音播放，請點一下畫面後按靜音再取消靜音［' + (error && error.name || '未知') + '］'); });
     }
+    applyVolume(run) {
+      if (run.volume) run.volume.gain.value = run.viaElement ? 0 : this.gain;
+      if (run.audio) { run.audio.muted = !run.viaElement; run.audio.volume = Math.min(1, this.gain); }
+    }
+    volume(value) {
+      this.gain = Math.max(0, Math.min(3, Number(value) || 0));
+      if (this.run) this.applyVolume(this.run);
+    }
     resumeAudio() { if (!this.run) return; this.run.context.resume().catch(() => {}); this.play(this.run); }
     prompt() { /* 開場只由後端已驗證情境設定一次，前端不能追加系統指令。 */ }
     manualTurn() { return false; }
@@ -177,7 +198,7 @@
       clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer);
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
-      [run.input, run.meter, run.remote, run.output, run.silent].forEach(n => { if (n) n.disconnect(); });
+      [run.input, run.meter, run.remote, run.output, run.volume].forEach(n => { if (n) n.disconnect(); });
       if (run.context) run.context.close().catch(() => {});
       this.emit('inputLevel', { level: 0, bands: [] }); this.emit('outputLevel', { level: 0, bands: [] }); this.emit('inputState', 'idle');
       run.cleanupTransport = () => {

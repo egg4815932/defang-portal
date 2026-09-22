@@ -10,10 +10,10 @@
   const shadow = host.attachShadow({ mode: 'open' });
   const css = document.createElement('link');
   css.rel = 'stylesheet';
-  css.href = new URL('ai-live.css?v=20260920-1', assetBase).href;
+  css.href = new URL('ai-live.css?v=20260922-3', assetBase).href;
   shadow.appendChild(css);
   const compactCss = document.createElement('link');
-  compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260920-2', assetBase).href;
+  compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260922-3', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
   scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260922-2', assetBase).href;
@@ -186,6 +186,16 @@
     view.settings.open = () => {}; // 設定頁只能從有權限的系統側欄進入。
     view.settings.valid = () => !scenarios.loading;
     view.feedback = new window.DFAIFeedback(mode);
+    const volumeKey = 'defang.ai.volume';
+    let volumePercent = 100;
+    try { volumePercent = Math.max(0, Math.min(200, Number(localStorage.getItem(volumeKey)) || 100)); } catch (error) {}
+    view.feedback.setVolume(volumePercent);
+    view.feedback.volume.addEventListener('input', () => {
+      volumePercent = Number(view.feedback.volume.value);
+      try { localStorage.setItem(volumeKey, String(volumePercent)); } catch (error) {}
+      if (view.client) view.client.volume(volumePercent / 100);
+      activity();
+    });
     page.querySelector('.conversation').prepend(view.feedback.element);
     view.capture = new window.DFAICapture(async () => {
       if (current !== view || view.capture.active) return;
@@ -229,6 +239,7 @@
       turn: () => { view.lines = {}; },
       ready: info => {
         controls(view, true, true);
+        view.client.volume(volumePercent / 100);
         if (!info.resumed && view.sessionSettings.provider !== 'openai' && view.sessionSettings.autoGreeting === 'on') view.client.prompt(view.sessionSettings.opening);
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },

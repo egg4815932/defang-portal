@@ -41,6 +41,9 @@
 .utility-dialog .audio-tools{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:0}
 .utility-dialog .audio-tools label{grid-column:1/-1;font-size:13px}
 .utility-dialog .audio-tools select{width:100%;max-width:none;min-width:0;grid-column:1}
+.utility-dialog .audio-tools input[type=range]{grid-column:1;width:100%;max-width:none;height:40px}
+.utility-dialog .audio-tools output{grid-column:2/-1;align-self:center}
+.utility-dialog .volume-note{grid-column:1/-1;font-size:11px}
 .utility-dialog .mic-device{grid-column:1/-1;font-size:11px}
 .utility-dialog .mic-health{margin:8px 0 14px}
 .utility-dialog .audio-review{max-height:none;min-height:0;overflow:visible;border:0;border-top:1px solid #dce9e1;padding-top:14px;background:transparent}

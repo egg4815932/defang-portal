@@ -37,6 +37,7 @@
       bridge.audio({ command: 'mute', runId: this.id, value });
     }
     resumeAudio() { if (this.run) bridge.audio({ command: 'resumeAudio', runId: this.id }); }
+    volume(value) { bridge.audio({ command: 'volume', runId: this.id, value }); }
     manualTurn() {
       if (!this.run || !this.run.ready || this.run.muted) return false;
       this.run.manualSpeaking = !this.run.manualSpeaking;

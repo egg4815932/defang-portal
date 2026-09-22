@@ -70,6 +70,16 @@
     opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1)}
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     opacity:0}
+  /* 等 GAS 的那幾秒：Logo 只以淡影靜靜呼吸，中線與系統名一律不出現。
+     刻意停在 translateY(9px)＝三拍動畫的起點位置，內容備妥時就從這個位置亮起來接著飄升，
+     看起來是一條連續的線，不是「淡影」與「動畫」兩段。 */
+  html:not(.boot-brand-ready):not(.app-ready) .boot-logo{
+    transform:translateY(9px);
+    animation:boot-logo-wake .9s cubic-bezier(.22,.78,.28,1) both,
+              boot-logo-breathe 3.8s ease-in-out .9s infinite
+  }
+  @keyframes boot-logo-wake{ from{opacity:0} to{opacity:.13} }
+  @keyframes boot-logo-breathe{ 0%,100%{opacity:.13} 50%{opacity:.19} }
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
     background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
   .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
@@ -77,8 +87,9 @@
   html.boot-brand-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) backwards;opacity:1}
   html.boot-brand-ready .boot-rule{animation:boot-rule-glow .82s cubic-bezier(.22,.78,.28,1) 1.23s both}
   html.boot-brand-ready .boot-name{animation:boot-name-settle 1.06s cubic-bezier(.2,.72,.2,1) 1.94s both}
+  /* from 的 .13 必須等於呼吸動畫的低點：從淡影原地亮起，中間不會先消失再出現。 */
   @keyframes boot-logo-arrive{
-    from{opacity:0;transform:translateY(9px)}
+    from{opacity:.13;transform:translateY(9px)}
     to{opacity:1;transform:none}
   }
   @keyframes boot-rule-glow{
@@ -102,6 +113,7 @@
   html.app-ready .boot-backdrop{opacity:0}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
+    html:not(.boot-brand-ready):not(.app-ready) .boot-logo{animation:none;opacity:.13;transform:translateY(9px)}
     html.boot-brand-ready .boot-logo,
     html.boot-brand-ready .boot-rule,
     html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
@@ -233,60 +245,71 @@
   <button type="button" id="iphoneFullscreenBtn" aria-label="隱藏 iPhone 系統列，進入完整畫面">⛶ 完整畫面</button>
 
 <script>
-/* viewport-ready 只負責安全區通道；品牌交棒必須同時等：
-   ① iframe 完整 load；② GAS 完成登入憑證分流，再穩定 180ms。
-   8 秒仍是錯誤頁保險：即使握手失敗，也要讓真正錯誤露出來，不能永遠卡在品牌頁。 */
+/* viewport-ready 只負責安全區通道。啟動的視覺順序是「先等內容，再一次把品牌動畫跑完」：
+     ① 等待期：Logo 只以淡影呼吸（純 CSS，見上方 boot-logo-breathe），中線與系統名不出現
+     ② iframe 完整 load ＋ GAS 回報分流完成 → 這時候才開跑三拍動畫
+     ③ 三拍整段跑完 → 立刻交棒進 APP
+   ⛔ 不可把三拍動畫綁回固定延遲（舊版綁版面穩定後 650ms）：那會讓動畫在 GAS 還沒回來時就跑完，
+      Logo 接著靜止杵在畫面上等交棒，使用者看到的就是「分兩段載入」。
+   兩道保險都不能拆：8 秒還等不到 GAS 就照樣開跑（至少讓品牌完整播完，再進去看真正的錯誤頁），
+   13 秒則無論如何硬交棒，不能永遠卡在品牌頁。 */
+var BRAND_SEQUENCE_MS = 3000;
 var appRevealScheduled = false;
 var appRevealFallback = null;
-var appFrameSettleTimer = null;
+var brandStartFallback = null;
 var appFrameLoaded = false;
 var appRouteSettled = false;
-var bootBrandTimer = null;
 var bootSequenceTimer = null;
-var bootSequenceSettled = false;
+var bootSequenceStarted = false;
 var bootMotionReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-var bootBrandEarliest = Date.now() + 650;
-function scheduleBootBrandAfterViewportSettles() {
-  clearTimeout(bootBrandTimer);
-  if (document.documentElement.classList.contains('app-ready') ||
-      document.documentElement.classList.contains('boot-brand-ready')) return;
-  bootBrandTimer = setTimeout(function () {
-    if (document.documentElement.classList.contains('app-ready')) return;
-    if (!document.getElementById('bootStage')) return;
-    document.documentElement.classList.add('boot-brand-ready');
-    clearTimeout(bootSequenceTimer);
-    bootSequenceTimer = setTimeout(function () {
-      bootSequenceSettled = true;
-      scheduleAppRevealAfterRouteSettles();
-    }, bootMotionReduced ? 0 : 3000);
-  }, Math.max(180,bootBrandEarliest - Date.now()));
+
+/* 三拍動畫只跑一次，跑完直接交棒；開跑之後不再回頭看任何條件，才不會被中途打斷。 */
+function beginBrandSequence() {
+  if (bootSequenceStarted) return;
+  if (document.documentElement.classList.contains('app-ready')) return;
+  if (!document.getElementById('bootStage')) return;
+  bootSequenceStarted = true;
+  clearTimeout(brandStartFallback);
+  document.documentElement.classList.add('boot-brand-ready');
+  clearTimeout(bootSequenceTimer);
+  bootSequenceTimer = setTimeout(revealApp, bootMotionReduced ? 320 : BRAND_SEQUENCE_MS);
 }
-scheduleBootBrandAfterViewportSettles();
-window.addEventListener('resize',scheduleBootBrandAfterViewportSettles);
-window.addEventListener('orientationchange',scheduleBootBrandAfterViewportSettles);
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize',scheduleBootBrandAfterViewportSettles);
+
+/* iframe 載完、且 GAS 已回報分流，內容才算真的備妥。 */
+function scheduleBrandSequence() {
+  if (!appFrameLoaded || !appRouteSettled) return;
+  beginBrandSequence();
 }
+
+function commitAppReady() {
+  if (document.documentElement.classList.contains('app-ready')) return;
+  document.documentElement.classList.add('app-ready');
+  var stage = document.getElementById('bootStage');
+  if (stage) {
+    stage.setAttribute('aria-hidden','true');
+    setTimeout(function () { stage.remove(); }, 1100);
+  }
+}
+
 function revealApp() {
   if (appRevealScheduled || document.documentElement.classList.contains('app-ready')) return;
   appRevealScheduled = true;
   clearTimeout(appRevealFallback);
-  requestAnimationFrame(function () {
-    requestAnimationFrame(function () {
-      document.documentElement.classList.add('app-ready');
-      var stage = document.getElementById('bootStage');
-      if (stage) {
-        stage.setAttribute('aria-hidden','true');
-        setTimeout(function () { stage.remove(); }, 1100);
-      }
-    });
-  });
+  clearTimeout(brandStartFallback);
+  /* ⛔ 交棒不可「只」交給 requestAnimationFrame：分頁在背景時瀏覽器把 rAF 整個凍結，
+        而這裡已經上鎖又拆掉逾時保險 —— 2026-09-22 實測背景分頁 30 秒後 appFrameLoaded／
+        appRouteSettled／動畫條件全是 true，app-ready 就是加不上去，永久卡在品牌頁。
+        畫面沒在重繪時本來也沒有交棒閃爍要避，直接同步交棒。 */
+  if (document.visibilityState === 'hidden') { commitAppReady(); return; }
+  requestAnimationFrame(function () { requestAnimationFrame(commitAppReady); });
 }
-function scheduleAppRevealAfterRouteSettles() {
-  clearTimeout(appFrameSettleTimer);
-  if (!appFrameLoaded || !appRouteSettled || !bootSequenceSettled) return;
-  appFrameSettleTimer = setTimeout(revealApp,180);
-}
+
+/* 回到前景時補做一次，涵蓋 rAF callback 在凍結期間被整批丟棄的情形。 */
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState !== 'visible') return;
+  if (appRevealScheduled) commitAppReady();
+});
+
 var appFrame = document.querySelector('iframe');
 if (appFrame) {
   appFrame.addEventListener('load',function () {
@@ -294,10 +317,11 @@ if (appFrame) {
     document.documentElement.classList.remove('iphone-video-native');
     scheduleViewportInsets(0);
     appFrameLoaded = true;
-    scheduleAppRevealAfterRouteSettles();
+    scheduleBrandSequence();
   });
 }
-appRevealFallback = setTimeout(revealApp,8000);
+brandStartFallback = setTimeout(beginBrandSequence,8000);
+appRevealFallback = setTimeout(revealApp,13000);
 
 /* PWA 殼頁禁止瀏覽器原生 pinch zoom。內層 GAS 另有相同防線；雙層都擋才能避免
    跨網域 iframe 縮放時連續觸發 outer/inner visual viewport 重排，把手機 WebView 撐垮。 */
@@ -475,7 +499,7 @@ window.addEventListener('message', function (e) {
   if (String(e.origin).indexOf('.google') < 0) return;
   if (e.source !== appViewportTarget || e.origin !== appViewportOrigin) return;
   appRouteSettled = true;
-  scheduleAppRevealAfterRouteSettles();
+  scheduleBrandSequence();
 });
 
 /* GAS 內容位在 Google 的跨網域 sandbox iframe；手機鎖屏時 WebView 可能只重建內層 iframe。
@@ -639,16 +663,16 @@ window.addEventListener('message', function (e) {
   });
 })();
 </script>
-<script src="ai-live-client.js?v=20260922-2"></script>
-<script src="ai-openai-client.js?v=20260922-2"></script>
-<script src="ai-live-service.js?v=20260920-9"></script>
+<script src="ai-live-client.js?v=20260922-3"></script>
+<script src="ai-openai-client.js?v=20260922-3"></script>
+<script src="ai-live-service.js?v=20260922-3"></script>
 <script src="ai-scenario-schema.js?v=20260920-9"></script>
 <script src="ai-voice-notes.js?v=20260922-2"></script>
 <script src="ai-scenarios.js?v=20260922-2"></script>
-<script src="ai-live-feedback.js?v=20260920-5"></script>
+<script src="ai-live-feedback.js?v=20260922-3"></script>
 <script src="ai-live-settings.js?v=20260920-3"></script>
 <script src="ai-live-capture.js?v=20260920-1"></script>
-<script src="ai-live-compact.js?v=20260920-9"></script>
-<script src="ai-live-ui.js?v=20260922-2"></script>
+<script src="ai-live-compact.js?v=20260922-3"></script>
+<script src="ai-live-ui.js?v=20260922-3"></script>
 </body>
 </html>

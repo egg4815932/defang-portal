@@ -82,6 +82,7 @@
     else if (m.command === 'mute') { client.mute(!!m.value); send('run', { runId, run: snapshot() }); }
     else if (m.command === 'prompt' && typeof m.text === 'string') client.prompt(m.text);
     else if (m.command === 'resumeAudio') client.resumeAudio();
+    else if (m.command === 'volume' && client.volume) client.volume(m.value);
     else if (m.command === 'manualTurn') { client.manualTurn(); send('run', { runId, run: snapshot() }); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });

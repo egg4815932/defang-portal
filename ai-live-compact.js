@@ -64,7 +64,7 @@
       return dialog;
     }
     function open(dialog) { if (!dialog.open) dialog.showModal(); }
-    const audioDialog = panel('收音與試聽'); audioDialog.classList.add('audio-panel');
+    const audioDialog = panel('收音與播放'); audioDialog.classList.add('audio-panel');
     const audioBody = audioDialog.querySelector('.utility-content');
     audioBody.append(view.feedback.element.querySelector('.audio-tools'), view.feedback.health, view.capture.element);
     view.capture.element.open = true; view.capture.element.querySelector('summary').hidden = true;
@@ -72,10 +72,10 @@
     notes[0].textContent = '最多 15 秒 · 僅此頁暫存'; notes[1].textContent = '原音量播放 · 關閉頁面即清除';
     audioDialog.addEventListener('close', () => view.capture.audio.pause());
     const audioButton = document.createElement('button'); audioButton.type = 'button'; audioButton.dataset.audioTools = '';
-    action(audioButton, 'headphones', '收音與試聽'); audioButton.onclick = () => open(audioDialog);
+    action(audioButton, 'headphones', '收音與播放'); audioButton.onclick = () => open(audioDialog);
     function health() {
       audioButton.classList.toggle('warning', view.feedback.health.classList.contains('warning'));
-      audioButton.title = view.feedback.health.classList.contains('warning') ? view.feedback.health.textContent : '收音與試聽';
+      audioButton.title = view.feedback.health.classList.contains('warning') ? view.feedback.health.textContent : '收音與播放';
       audioButton.setAttribute('aria-description', view.feedback.health.textContent);
     }
     new MutationObserver(health).observe(view.feedback.health, { attributes: true, childList: true, subtree: true }); health();

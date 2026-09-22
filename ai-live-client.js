@@ -21,6 +21,7 @@
     constructor(callbacks, processorUrl) {
       this.callbacks = callbacks;
       this.processorUrl = processorUrl;
+      this.gain = 1;
       this.run = null;
     }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
@@ -96,7 +97,8 @@
         run.processor.connect(run.context.destination);
         run.output = run.context.createAnalyser();
         run.output.fftSize = 1024;
-        run.output.connect(run.context.destination);
+        run.volume = run.context.createGain(); run.volume.gain.value = this.gain;
+        run.output.connect(run.volume); run.volume.connect(run.context.destination);
         if (!run.testing) {
           await run.context.audioWorklet.addModule(new URL('ai-live-playback.js?v=20260919-8', new URL(this.processorUrl, location.href)).href);
           if (!current()) return false;
@@ -255,6 +257,10 @@
       run.manualSpeaking = !run.manualSpeaking;
       return true;
     }
+    volume(value) {
+      this.gain = Math.max(0, Math.min(3, Number(value) || 0));
+      if (this.run && this.run.volume) this.run.volume.gain.value = this.gain;
+    }
     resumeAudio() {
       const run = this.run;
       if (!run) return;
@@ -298,6 +304,7 @@
       this.clearAudio(run);
       if (run.player) { run.player.port.onmessage = null; run.player.onprocessorerror = null; run.player.disconnect(); }
       if (run.output) run.output.disconnect();
+      if (run.volume) run.volume.disconnect();
       this.emit('inputLevel', { level: 0, bands: [] });
       this.emit('outputLevel', { level: 0, bands: [] });
       this.emit('inputState', 'idle');
