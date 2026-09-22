@@ -7,6 +7,8 @@
     const study = S.defaults('教材陪練'); study.settings.requireMaterial = 'on';
     const builtins = [{ id: 'builtin-chat', scene: general }, { id: 'builtin-tutor', scene: study }];
     let items = [], selectedId = builtins[0].id, editingId = '', revision = 0, dirty = false, loading = false, loaded = false, generation = 0;
+    // selectedId 是對話頁套用中的情境；viewingId 是設定頁正在看的那一份，兩者可以不同。
+    let viewingId = builtins[0].id;
     let busy = false;
     const page = document.createElement('section'); page.id = 'ai-tutor'; page.className = 'page scenario-page'; page.hidden = true;
     page.setAttribute('role', 'dialog'); page.setAttribute('aria-modal', 'true'); page.setAttribute('aria-label', 'AI 語音設定');
@@ -102,10 +104,15 @@
       updateInstruction(); find('[data-delete]').disabled = !editingId || loading;
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
     }
+    function show(item) {
+      viewingId = item.id; library.value = item.id;
+      fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision);
+    }
+    function viewing() { return viewingId ? all().find(x => x.id === viewingId) || current() : null; }
     function discard() { return !dirty || window.confirm('這份情境有尚未儲存的修改，要捨棄修改嗎？'); }
     function choices() {
       [selector, library].forEach(el => { el.replaceChildren(); all().forEach(item => el.add(new Option(item.scene.name + (item.id.startsWith('builtin-') ? ' · 內建' : ''), item.id))); });
-      selector.value = selectedId; library.value = editingId || selectedId;
+      selector.value = selectedId; library.value = viewingId || editingId || selectedId;
       callModel.value = current().scene.model;
       describe();
       if (hooks.change) hooks.change(current().scene);
@@ -131,8 +138,9 @@
         if (version !== generation) return;
         items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) }));
         if (!all().some(item => item.id === selectedId)) selectedId = builtins[0].id;
+        if (viewingId && !all().some(item => item.id === viewingId)) viewingId = selectedId;
         loaded = true; choices();
-        if (!dirty || force) { const item = current(); fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision); }
+        if (!dirty || force) { const item = viewing(); if (item) show(item); }
       } catch (error) { if (version === generation) { message(error.message, true); info.textContent = '情境庫載入失敗，可重新載入'; } }
       finally { if (version === generation) lock(false); }
     }
@@ -143,22 +151,21 @@
       try {
         const result = await hooks.rpc({ action: 'save', id: editingId, revision, scene });
         if (version !== generation) return;
-        items = result.items; selectedId = result.selectedId;
-        const item = current(); fill(item.scene, item.id, item.revision); choices(); message('已儲存至你的帳號');
+        items = result.items; selectedId = result.selectedId; viewingId = selectedId;
+        choices(); show(current()); message('已儲存至你的帳號');
         if (use) hooks.use();
       } catch (error) { if (version === generation) message(error.message, true); }
       finally { if (version === generation) lock(false); }
     }
-    selector.onchange = () => { selectedId = selector.value; choices(); hooks.activity(); };
+    selector.onchange = () => { selectedId = selector.value; if (!dirty) viewingId = selectedId; choices(); hooks.activity(); };
     library.onchange = () => {
-      if (!discard()) { library.value = editingId || selectedId; return; }
-      const item = all().find(x => x.id === library.value);
-      fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision);
+      if (!discard()) { library.value = viewingId || editingId || selectedId; return; }
+      show(all().find(x => x.id === library.value));
     };
     page.addEventListener('input', event => { if (event.target.matches('input,textarea')) changed(); });
     page.addEventListener('change', event => { if (event.target !== library && event.target.matches('select')) changed(); });
-    find('[data-new]').onclick = () => { if (discard()) fill(S.defaults()); };
-    find('[data-copy]').onclick = () => { try { const scene = read(); scene.name = (scene.name + ' 副本').slice(0, 80); fill(scene); dirty = true; message('已複製成新草稿，請儲存'); } catch (error) { message(error.message, true); } };
+    find('[data-new]').onclick = () => { if (discard()) { viewingId = ''; fill(S.defaults()); } };
+    find('[data-copy]').onclick = () => { try { const scene = read(); scene.name = (scene.name + ' 副本').slice(0, 80); viewingId = ''; fill(scene); dirty = true; message('已複製成新草稿，請儲存'); } catch (error) { message(error.message, true); } };
     find('[data-reload]').onclick = () => { if (discard()) load(true); };
     find('[data-save]').onclick = () => save(false); find('[data-save-use]').onclick = () => save(true);
     find('[data-use]').onclick = () => {
@@ -171,7 +178,7 @@
       try {
         const result = await hooks.rpc({ action: 'delete', id: editingId, revision });
         if (version !== generation) return;
-        items = result.items; selectedId = builtins[0].id; choices(); fill(current().scene); message('已刪除');
+        items = result.items; selectedId = builtins[0].id; viewingId = selectedId; choices(); show(current()); message('已刪除');
       } catch (error) { if (version === generation) message(error.message, true); }
       finally { if (version === generation) lock(false); }
     };
@@ -180,15 +187,15 @@
       try {
         const old = JSON.parse(localStorage.getItem('defang.ai.settings.v1.' + button.dataset.import));
         if (!old) { message('這個瀏覽器沒有這份舊設定'); return; }
-        fill(S.migrate(old, button.dataset.import)); dirty = true; message('已匯入成草稿，儲存後就能選用');
+        viewingId = ''; fill(S.migrate(old, button.dataset.import)); dirty = true; message('已匯入成草稿，儲存後就能選用');
       } catch (error) { message('無法匯入：' + error.message, true); }
     }; });
     choices(); fill(general);
     return { page, selector, picker, info, load, current: () => S.normalize(Object.assign({}, current().scene, { model: callModel.value })),
       get loading() { return loading; },
-      edit: () => { notes.load(); if (!dirty) { const item = current(); fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision); } },
+      edit: () => { notes.load(); if (!dirty) { const item = viewing(); if (item) show(item); } },
       lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading; },
-      reset: () => { generation++; notes.reset(); items = []; selectedId = builtins[0].id; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
+      reset: () => { generation++; notes.reset(); items = []; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };
   };
