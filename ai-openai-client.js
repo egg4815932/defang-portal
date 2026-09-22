@@ -107,7 +107,12 @@
             const newLine = Number.isFinite(run.times[role]) && data.start_ms - run.times[role] > 1800;
             run.times[role] = data.end_ms;
             if (role === 'model' && !run.speakAt) run.speakAt = Date.now();
+            if (run.brain) run.brain.note(role, data.delta, newLine);
             this.emit('text', { role, text: data.delta, newLine }); this.emit('activity');
+          } else if (data.type === 'session.delegation.created' && run.brain) {
+            run.brain.request(data.delegation && data.delegation.id, payload => {
+              if (dc.readyState === 'open') dc.send(JSON.stringify(payload));
+            });
           } else if (data.type === 'error') {
             const code = data.error && data.error.code;
             this.fail(run, 'GPT-Live 回報錯誤' + (typeof code === 'string' && /^[a-z_]{3,80}$/.test(code) ? '：' + code : '，請重新開始'));
@@ -159,6 +164,8 @@
         const result = await getTicket({ action: 'create', sdp: pc.localDescription.sdp });
         if (!current()) { if (result && result.sessionId) getTicket({ action: 'close', sessionId: result.sessionId }).catch(() => {}); return false; }
         run.ticket = result;
+        // 只有情境選了 Gemini 大腦時，後端才會回 ownBrain；OpenAI 大腦這裡永遠是 null。
+        if (result && result.ownBrain && root.DFBrainClient) run.brain = new root.DFBrainClient(getTicket, message => this.emit('state', message));
         run.expiry = setTimeout(() => this.fail(run, '本次 GPT-Live 通話已達設定期限'), Math.max(0, result.expiresAt - Date.now()));
         await pc.setRemoteDescription({ type: 'answer', sdp: result.sdp });
         return current();
@@ -196,6 +203,7 @@
       const run = this.run; if (!run) return;
       this.run = null;
       clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer);
+      if (run.brain) run.brain.reset();
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
       [run.input, run.meter, run.remote, run.output, run.volume].forEach(n => { if (n) n.disconnect(); });

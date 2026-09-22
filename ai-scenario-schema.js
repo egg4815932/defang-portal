@@ -79,8 +79,10 @@ var DFAISchema = (function () {
   choice('subtitles', '文字字幕', '模型與連線', [['both', '雙方'], ['user', '只有我'], ['model', '只有 AI'], ['off', '關閉']], 'both');
   choice('thinking', '思考深度', '模型與連線', [['LOW', '低'], ['MEDIUM', '中'], ['HIGH', '高']], 'LOW', '只適用 Extended Thinking。');
   // GPT-Live 專用：luna 的思考檔位與單次回答上限；兩項都在 delegation.responses 裡生效。
-  // 這幾格都是 delegation.responses 的參數：語音層只負責聽與說，推理都在這顆大腦。
-  choice('openaiBrain', '大腦模型', '模型與連線', [['gpt-5.6-luna', 'Luna · 快又便宜'], ['gpt-5.6-terra', 'Terra · ChatGPT App 同級'], ['gpt-6-astra', 'Astra · 旗艦推理，語音會變慢']], 'gpt-5.6-luna', '只適用 GPT-Live-1。一通 10 分鐘的大腦費用約 Luna US$0.03、Terra US$0.27、Astra US$1.30；語音層另計 US$0.05／分鐘。Astra 沒有「不思考」檔位。');
+  // 這幾格設定的是大腦：語音層只負責聽與說，推理都在這裡。
+  // OpenAI 的大腦由 OpenAI 自己接（responses delegation）；Gemini 的要我們自己接（client delegation）。
+  var geminiBrains = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  choice('openaiBrain', '大腦模型', '模型與連線', [['gpt-5.6-luna', 'Luna · 快又便宜'], ['gpt-5.6-terra', 'Terra · ChatGPT App 同級'], ['gpt-6-astra', 'Astra · 旗艦推理，語音會變慢'], ['gemini-3.5-flash-lite', 'Gemini 3.5 Flash Lite · 走你的 Google 額度'], ['gemini-3.8-flash', 'Gemini 3.8 Flash · 走你的 Google 額度']], 'gpt-5.6-luna', '只適用 GPT-Live-1。一通 10 分鐘的大腦費用約 Luna US$0.03、Terra US$0.27、Astra US$1.30；語音層另計 US$0.05／分鐘。Astra 沒有「不思考」檔位。選 Gemini 時改由我們自己接大腦：思考程度不適用、字幕必須設為「雙方」，回話也會比 OpenAI 慢一點。');
   choice('openaiEffort', '大腦思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
   range('openaiMaxTokens', '大腦回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
   choice('openaiWebSearch', '大腦網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路；每次搜尋約 US$0.01，查回來的內容另計 token。網路資料不等於公司規定。');
@@ -119,6 +121,8 @@ var DFAISchema = (function () {
     // 沒打勾的欄位記在 off；內容照樣保留，只是這次不送出。
     out.off = fields.filter(function (f) { return f.toggle && offRaw.indexOf(f.key) >= 0; }).map(function (f) { return f.key; });
     if (out.settings.openaiBrain === 'gpt-6-astra' && out.settings.openaiEffort === 'none') throw new Error('Astra 沒有「不思考」檔位，請把大腦思考程度改成低或以上');
+    // Gemini 大腦要靠字幕事件重建對話，關掉任何一邊就拼不出上下文。
+    if (geminiBrains.indexOf(out.settings.openaiBrain) >= 0 && out.settings.subtitles !== 'both') throw new Error('Gemini 大腦要靠字幕重建對話內容，請把文字字幕設為「雙方」');
     if (out.settings.language === 'custom' && !out.settings.customLanguage) throw new Error('請填自訂語言');
     if (out.settings.autoGreeting === 'on' && !out.settings.opening) throw new Error('請填開場文字，或關閉自動開場');
     if (out.material.length > out.settings.materialLimit) throw new Error('教材超過此情境的字數上限');
@@ -170,5 +174,5 @@ var DFAISchema = (function () {
       opening: s.autoGreeting !== 'on' ? 'none' : (openai ? 'system' : 'turn')
     };
   }
-  return { fields: fields, voices: voices, openaiVoices: openaiVoices, normalize: normalize, instruction: instruction, delivery: delivery, defaults: defaults, migrate: migrate };
+  return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, defaults: defaults, migrate: migrate };
 })();
