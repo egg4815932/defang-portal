@@ -118,12 +118,10 @@
           this.emit('inputLevel', input);
           this.emit('outputLevel', running ? level(run.output) : { level: 0, bands: [] });
           if (run.audio && run.ready) {
-            const stalled = run.audio.paused || run.audio.muted || !run.audio.volume ? 'stopped' :
-              run.audio.currentTime === run.audioTime ? 'stalled' : 'playing';
-            run.audioTime = run.audio.currentTime;
-            if (stalled !== run.playState) {
-              run.playState = stalled;
-              if (stalled === 'stopped') { this.play(run); this.emit('state', '語音播放被停住了，正在重新播放'); }
+            const stopped = run.audio.paused || run.audio.muted || !run.audio.volume;
+            if (stopped !== run.audioStopped) {
+              run.audioStopped = stopped;
+              if (stopped) { this.play(run); this.emit('state', '語音播放被停住了，正在重新播放'); }
             }
           }
           const state = run.muted ? 'muted' : !running ? 'paused' : track.muted ? 'blocked' : !run.ready ? 'connecting' : Date.now() - run.lastSound > 8000 ? 'quiet' : 'sending';
