@@ -47,7 +47,11 @@
       var text = result && typeof result.text === 'string' ? result.text.trim() : '';
       if (!text) throw new Error('大腦沒有回覆內容');
       // 第一次接上報一次型號：不然使用者無法分辨是大腦回的還是語音層自己講的。
-      if (!self.announced) { self.announced = true; self.notify('大腦已接上：' + (result.model || '未知模型')); }
+      if (!self.announced) {
+        self.announced = true;
+        var actual = result.model || '未知模型', asked = result.requested;
+        self.notify('大腦已接上：' + actual + (asked && asked !== actual ? '（你選的是 ' + asked + '，Google 實際給的是前面那個）' : ''));
+      }
       if (result.searched > 0) self.notify('大腦查了網路（' + result.searched + ' 次搜尋）');
       // 使用者已經又說話了，這個答案就過期了，不要硬唸。
       if (self.pending) return;
