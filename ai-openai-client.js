@@ -41,12 +41,20 @@
         track.onended = () => { if (current()) this.fail(run, '麥克風已中斷，請重新開始'); };
         run.input = run.context.createMediaStreamSource(stream);
         run.meter = run.context.createAnalyser(); run.meter.fftSize = 1024; run.input.connect(run.meter);
-        run.output = run.context.createAnalyser(); run.output.fftSize = 1024; run.output.connect(run.context.destination);
+        // 出聲交給 <audio>；analyser 只做音波，仍需下游才會被驅動，所以用 0 音量接 destination。
+        run.output = run.context.createAnalyser(); run.output.fftSize = 1024;
+        run.silent = run.context.createGain(); run.silent.gain.value = 0;
+        run.output.connect(run.silent); run.silent.connect(run.context.destination);
         const pc = run.pc = new RTCPeerConnection();
         pc.ontrack = event => {
           if (!current()) return;
+          const remote = event.streams[0] || new MediaStream([event.track]);
+          // 遠端 WebRTC 音訊一定要有 <audio> 消費：只接 WebAudio 時 Chromium 與 iOS 都拿不到任何取樣。
+          if (!run.audio) { run.audio = new Audio(); run.audio.autoplay = true; run.audio.playsInline = true; }
+          run.audio.srcObject = remote;
+          this.play(run);
           if (run.remote) run.remote.disconnect();
-          run.remote = run.context.createMediaStreamSource(event.streams[0] || new MediaStream([event.track]));
+          run.remote = run.context.createMediaStreamSource(remote);
           run.remote.connect(run.output); run.context.resume().catch(() => {});
         };
         pc.onconnectionstatechange = () => {
@@ -73,7 +81,7 @@
           if (!current()) return;
           if (data.type === 'session.started' && !run.ready) {
             clearTimeout(run.timeout); run.ready = true; track.enabled = !run.muted;
-            run.lastSound = Date.now(); run.context.resume().catch(() => {});
+            run.lastSound = Date.now(); run.context.resume().catch(() => {}); this.play(run);
             this.emit('state', 'GPT-Live 已連線，可以開始說話'); this.emit('ready', { resumed: false });
           } else if (/^session\.(input|output)_transcript\.delta$/.test(data.type) && typeof data.delta === 'string') {
             const role = data.type.includes('input_') ? 'user' : 'model';
@@ -132,7 +140,12 @@
       if (run.stream) run.stream.getAudioTracks().forEach(t => { t.enabled = run.ready && !value; });
       if (run.channel && run.channel.readyState === 'open') run.channel.send(JSON.stringify({ type: value ? 'session.input_audio.mute' : 'session.input_audio.unmute' }));
     }
-    resumeAudio() { if (this.run) this.run.context.resume().catch(() => {}); }
+    play(run) {
+      if (!run.audio) return;
+      const attempt = run.audio.play();
+      if (attempt && attempt.catch) attempt.catch(() => { if (this.run === run) this.emit('state', '瀏覽器擋住了語音播放，請點一下畫面後按靜音再取消靜音'); });
+    }
+    resumeAudio() { if (!this.run) return; this.run.context.resume().catch(() => {}); this.play(this.run); }
     prompt() { /* 開場只由後端已驗證情境設定一次，前端不能追加系統指令。 */ }
     manualTurn() { return false; }
     fail(run, message) { if (this.run !== run) return; this.stop(); this.emit('ended'); this.emit('error', message); }
@@ -141,7 +154,8 @@
       this.run = null;
       clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer);
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
-      [run.input, run.meter, run.remote, run.output].forEach(n => { if (n) n.disconnect(); });
+      if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio = null; }
+      [run.input, run.meter, run.remote, run.output, run.silent].forEach(n => { if (n) n.disconnect(); });
       if (run.context) run.context.close().catch(() => {});
       this.emit('inputLevel', { level: 0, bands: [] }); this.emit('outputLevel', { level: 0, bands: [] }); this.emit('inputState', 'idle');
       run.cleanupTransport = () => {
