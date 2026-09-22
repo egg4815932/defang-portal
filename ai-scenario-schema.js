@@ -8,8 +8,9 @@ var DFAISchema = (function () {
   function range(key, label, group, min, max, step, value, unit, hint) {
     fields.push({ key: key, label: label, group: group, type: 'range', min: min, max: max, step: step, value: value, unit: unit, hint: hint || '' });
   }
-  function text(key, label, group, value, max, hint) {
-    fields.push({ key: key, label: label, group: group, type: 'text', value: value, max: max || 2000, hint: hint || '文字指令：引導 AI，不是硬性開關。留白代表不加這段交代。' });
+  // toggle：設定頁在右邊給一個勾勾，取消就整條不送；always 的欄位由別的開關決定，不另外給勾勾。
+  function text(key, label, group, value, max, hint, always) {
+    fields.push({ key: key, label: label, group: group, type: 'text', value: value, max: max || 2000, toggle: !always, hint: hint || '文字指令：引導 AI，不是硬性開關。取消右邊的勾選就不送這段。' });
   }
   var onoff = [['on', '開啟'], ['off', '關閉']];
   // Google 官方 Gemini TTS 性別分類與 Live API 音色特色，核對於 2026-09-20。
@@ -39,7 +40,7 @@ var DFAISchema = (function () {
   ]);
   choice('openaiVoice', 'GPT-Live 音色', '聲音與語言', openaiVoices.map(function (v) { return [v[0], v.join(' · ')]; }), 'marin', '依 OpenAI 官方聲音呈現與口音標示；未標示代表官方未公布。溫柔、活潑等聽感可記在下方備註，中文表現請以試聽為準。Maple 是 ChatGPT 原生音色，目前不在 GPT-Live API 公開名單中。');
   choice('language', '回應語言', '聲音與語言', [['zh-TW', '台灣中文'], ['en-US', '美式英語'], ['en-GB', '英式英語'], ['ja', '日語'], ['ko', '韓語'], ['auto', '跟隨我說的語言'], ['custom', '自訂']], 'zh-TW', '以文字指令引導，不攔截模型音訊。');
-  text('customLanguage', '自訂語言', '聲音與語言', '', 60, '選擇自訂語言時必填。');
+  text('customLanguage', '自訂語言', '聲音與語言', '', 60, '選擇自訂語言時必填。', true);
   text('accent', '口音偏好', '聲音與語言', '', 60);
   text('languageRule', '語言補充規則', '聲音與語言', '回應語言優先於口音與教材語言。中文模式使用繁體中文與台灣慣用詞；英文單字、產品名稱、背景英語與收音不清楚都不得因此改用英文回答。優先按台灣華語理解近音詞，不清楚時先確認原意，不把雜音猜成外語。');
   range('pacePercent', '說話速度偏好', '聲音與語言', 50, 150, 5, 100, '%', '100% 是自然速度；寫進指令，不是播放器倍速。');
@@ -62,7 +63,7 @@ var DFAISchema = (function () {
   text('capabilityRule', '能力說明', '角色與教學', '你不能操作內部系統、讀取員工資料或存取未提供的教材。', 2000, '可修改說明文字；不會因此取得系統工具或資料權限。');
   text('extraRule', '其他自訂指令', '角色與教學', '', 6000);
   choice('autoGreeting', '連上後自動開場', '開場與教材', onoff, 'on');
-  text('opening', '替你送出的第一句話', '開場與教材', '我已準備好，請依照設定的教學方式開始。', 2000, '開啟自動開場時，新通話送一次；接回原對話不重送。');
+  text('opening', '替你送出的第一句話', '開場與教材', '我已準備好，請依照設定的教學方式開始。', 2000, '開啟自動開場時，新通話送一次；接回原對話不重送。', true);
   choice('requireMaterial', '開始前必須有教材', '開場與教材', onoff, 'off');
   range('materialLimit', '這個情境的教材字數上限', '開場與教材', 500, 12000, 500, 12000, '字', '系統最高 12,000 字。');
   choice('automatic', '說話分段方式', '收音與接話', [['on', 'AI 自動判斷'], ['off', '手動按「開始說話／送出」']], 'on', '手動模式只在按下開始說話後送聲音，送出時結束這一段。');
@@ -111,6 +112,10 @@ var DFAISchema = (function () {
       } else v = str(v, f.value, f.max, f.label);
       out.settings[f.key] = v;
     });
+    var offRaw = raw.off === undefined ? [] : raw.off;
+    if (!Array.isArray(offRaw)) throw new Error('指令開關格式不正確');
+    // 沒打勾的欄位記在 off；內容照樣保留，只是這次不送出。
+    out.off = fields.filter(function (f) { return f.toggle && offRaw.indexOf(f.key) >= 0; }).map(function (f) { return f.key; });
     if (out.settings.language === 'custom' && !out.settings.customLanguage) throw new Error('請填自訂語言');
     if (out.settings.autoGreeting === 'on' && !out.settings.opening) throw new Error('請填開場文字，或關閉自動開場');
     if (out.material.length > out.settings.materialLimit) throw new Error('教材超過此情境的字數上限');
@@ -118,16 +123,19 @@ var DFAISchema = (function () {
     return out;
   }
   function instruction(scene) {
-    var s = scene.settings;
+    var s = scene.settings, off = scene.off || [];
+    // 沒打勾的欄位一律當成空字串，等於這次不送這條。
+    function rule(key) { return off.indexOf(key) < 0 ? s[key] : ''; }
     var languages = { 'zh-TW': '台灣中文（台灣華語）', 'en-US': '美式英語', 'en-GB': '英式英語', ja: '日語', ko: '韓語', auto: '跟隨使用者正在使用的語言', custom: s.customLanguage };
-    var methods = { ask: s.teachingAskRule, explain: s.teachingExplainRule, quiz: s.teachingQuizRule, hint: s.teachingHintRule };
-    var teaching = s.teaching === 'off' ? '' : [methods[s.teaching],
-      s.questions > 0 ? s.questionRule.replace(/\{題數\}/g, String(s.questions)) : '', s.teachingRule].filter(Boolean).join('\n');
-    return [s.soundRule, s.honestyRule, s.capabilityRule, '本次回應語言：' + languages[s.language] + '。', s.languageRule,
-      s.accent ? '口音偏好：' + JSON.stringify(s.accent) : '', s.roleRule, s.toneRule,
-      '語速目標約為自然速度的 ' + s.pacePercent + '%。每次回答目標 ' + s.sentences + ' 句。', s.lengthRule,
-      s.listeningRule, teaching,
-      s.materialRule, s.examRule, s.extraRule, scene.material ? '<教材>\n' + scene.material + '\n</教材>' : '本次沒有提供教材。'].filter(Boolean).join('\n');
+    var methods = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
+    var teaching = s.teaching === 'off' ? '' : [methods[s.teaching] ? rule(methods[s.teaching]) : '',
+      s.questions > 0 ? rule('questionRule').replace(/\{題數\}/g, String(s.questions)) : '', rule('teachingRule')].filter(Boolean).join('\n');
+    var accent = rule('accent');
+    return [rule('soundRule'), rule('honestyRule'), rule('capabilityRule'), '本次回應語言：' + languages[s.language] + '。', rule('languageRule'),
+      accent ? '口音偏好：' + JSON.stringify(accent) : '', rule('roleRule'), rule('toneRule'),
+      '語速目標約為自然速度的 ' + s.pacePercent + '%。每次回答目標 ' + s.sentences + ' 句。', rule('lengthRule'),
+      rule('listeningRule'), teaching,
+      rule('materialRule'), rule('examRule'), rule('extraRule'), scene.material ? '<教材>\n' + scene.material + '\n</教材>' : '本次沒有提供教材。'].filter(Boolean).join('\n');
   }
   function defaults(name) { return normalize({ name: name || '新情境' }); }
   function migrate(old, mode) {
@@ -150,7 +158,6 @@ var DFAISchema = (function () {
     var s = scene.settings, openai = scene.model === 'gpt-live-1';
     var parts = [{ text: instruction(scene), fixed: false }];
     if (openai) {
-      parts.push({ text: '遇到需要推理、教材講解或判斷答案的問題，交由後端協助，再自然口語回答。', fixed: true });
       parts.push({ text: s.autoGreeting === 'on' ? '連線後請主動回應這個開場要求：' + s.opening : '連線後先等待使用者說話，不主動開場。', fixed: true });
     }
     return {
