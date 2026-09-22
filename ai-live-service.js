@@ -87,6 +87,10 @@
         if (options && options.action === 'close') {
           send('close-session', { runId: id, sessionId: options.sessionId }); resolve({ closed: true }); return;
         }
+        // 心跳跟 close 一樣不占 ticketWait 這個單一等待槽，免得跟同時在飛的 create／大腦請求互相蓋掉。
+        if (options && options.action === 'heartbeat') {
+          send('heartbeat', { runId: id, sessionId: options.sessionId }); resolve({ ok: true }); return;
+        }
         ticketWait = { resolve, reject, runId: id, timer: setTimeout(() => {
           if (ticketWait && ticketWait.runId === id) { ticketWait = null; reject(new Error('系統連線逾時，請重新登入後再試')); }
         }, 45000) };

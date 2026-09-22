@@ -55,6 +55,11 @@
       }
       return;
     }
+    if (m.type === 'heartbeat') {
+      const getTicket = sessionClosers.get(m.runId);
+      if (getTicket) getTicket({ action: 'heartbeat', sessionId: m.sessionId }).catch(() => {});
+      return;
+    }
     if (m.type === 'devices') {
       const request = devices.get(m.requestId);
       if (request) { clearTimeout(request.timer); request.resolve(m.devices); devices.delete(m.requestId); }

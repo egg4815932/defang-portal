@@ -169,6 +169,11 @@
         // 只有情境選了 Gemini 大腦時，後端才會回 ownBrain；OpenAI 大腦這裡永遠是 null。
         if (result && result.ownBrain && root.DFBrainClient) run.brain = new root.DFBrainClient(getTicket, message => this.emit('state', message));
         run.expiry = setTimeout(() => this.fail(run, '本次 GPT-Live 通話已達設定期限'), Math.max(0, result.expiresAt - Date.now()));
+        // 雲端巡邏靠這個心跳判斷通話還活著；當機或被滑掉 APP 就沒人送，雲端會自己掛斷，不必等這裡處理。
+        run.heartbeat = setInterval(() => {
+          if (!current() || !run.ticket) return;
+          run.getTicket({ action: 'heartbeat', sessionId: run.ticket.sessionId }).catch(() => {});
+        }, 60000);
         await pc.setRemoteDescription({ type: 'answer', sdp: result.sdp });
         return current();
       } catch (error) {
@@ -213,7 +218,7 @@
     stop() {
       const run = this.run; if (!run) return;
       this.run = null;
-      clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer);
+      clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer); clearInterval(run.heartbeat);
       if (run.brain) run.brain.reset();
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
