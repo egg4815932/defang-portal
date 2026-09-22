@@ -17,7 +17,7 @@
         '<button type="button" data-test-mic>測試麥克風</button><button type="button" data-resume hidden>恢復音訊</button>' +
         '<span class="mic-device">開始後會顯示實際使用的裝置</span>' +
         '<label class="volume-label" for="vol-' + mode + '">播放音量</label>' +
-        '<input id="vol-' + mode + '" type="range" data-volume min="0" max="200" step="10" value="100">' +
+        '<input id="vol-' + mode + '" type="range" data-volume min="0" max="300" step="10" value="100">' +
         '<output for="vol-' + mode + '" data-volume-value>100%</output>' +
         '<span class="note volume-note">手機的音量鍵在通話中指向「通話音量」，這條滑桿只管 AI 的聲音；超過 100% 會再放大，太大聲可能破音。</span></div>' +
         '<div class="audio-meters"><div class="meter meter-user"><div class="meter-head"><b>你的聲音</b><span data-input-label>等待聲音</span></div>' +

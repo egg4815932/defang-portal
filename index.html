@@ -68,12 +68,18 @@
   .boot-backdrop::after{width:min(360px,46vw);height:min(360px,46vw);bottom:-28%;left:-7%;background:rgba(213,232,215,.26)}
   .boot-lockup{position:relative;z-index:1;display:grid;justify-items:center;transform:translateY(-1.6vh);
     opacity:1;transition:opacity .5s cubic-bezier(.4,0,.2,1)}
+  /* ⛔ 這個 opacity:0 是防線，不是佔位，拿掉會直接重現「半截 LOGO」。
+     logo-brand.png 是非交錯 PNG（由上往下逐列解碼），瀏覽器在位元組還沒收完時
+     就會把已有的掃描線畫出來。2026-09-23 可控重現：後半段位元組不送，畫面就是
+     半顆紅心＋被削掉的字，而且此時 class 已經是 boot-brand-ready、opacity 已是 1。
+     所以 Logo 的任何可見度一律綁 html.boot-logo-ready（＝img.decode() 真的完成），
+     淡影呼吸也不例外 —— 淡影畫的是同一張半截圖，只是當下看不出來。 */
   .boot-logo{display:block;width:min(340px,48vw);max-height:112px;height:auto;aspect-ratio:827/105;object-fit:contain;
     opacity:0}
   /* 等 GAS 的那幾秒：Logo 只以淡影靜靜呼吸，中線與系統名一律不出現。
      刻意停在 translateY(9px)＝三拍動畫的起點位置，內容備妥時就從這個位置亮起來接著飄升，
      看起來是一條連續的線，不是「淡影」與「動畫」兩段。 */
-  html:not(.boot-brand-ready):not(.app-ready) .boot-logo{
+  html.boot-logo-ready:not(.boot-brand-ready):not(.app-ready) .boot-logo{
     transform:translateY(9px);
     animation:boot-logo-wake .9s cubic-bezier(.22,.78,.28,1) both,
               boot-logo-breathe 3.8s ease-in-out .9s infinite
@@ -84,7 +90,7 @@
     background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
   .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
   /* 精品三拍：Logo → 中線微光 → 系統名稱舒展。 */
-  html.boot-brand-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) backwards;opacity:1}
+  html.boot-brand-ready.boot-logo-ready .boot-logo{animation:boot-logo-arrive 1.36s cubic-bezier(.22,.78,.28,1) backwards;opacity:1}
   html.boot-brand-ready .boot-rule{animation:boot-rule-glow .82s cubic-bezier(.22,.78,.28,1) 1.23s both}
   html.boot-brand-ready .boot-name{animation:boot-name-settle 1.06s cubic-bezier(.2,.72,.2,1) 1.94s both}
   /* from 的 .13 必須等於呼吸動畫的低點：從淡影原地亮起，中間不會先消失再出現。 */
@@ -113,8 +119,8 @@
   html.app-ready .boot-backdrop{opacity:0}
   html:not(.app-ready) #iphoneFullscreenBtn{display:none!important}
   @media (prefers-reduced-motion:reduce){
-    html:not(.boot-brand-ready):not(.app-ready) .boot-logo{animation:none;opacity:.13;transform:translateY(9px)}
-    html.boot-brand-ready .boot-logo,
+    html.boot-logo-ready:not(.boot-brand-ready):not(.app-ready) .boot-logo{animation:none;opacity:.13;transform:translateY(9px)}
+    html.boot-brand-ready.boot-logo-ready .boot-logo,
     html.boot-brand-ready .boot-rule,
     html.boot-brand-ready .boot-name{animation:none;opacity:1;transform:none}
     .boot-lockup{transition:none}
@@ -247,7 +253,8 @@
 <script>
 /* viewport-ready 只負責安全區通道。啟動的視覺順序是「先等內容，再一次把品牌動畫跑完」：
      ① 等待期：Logo 只以淡影呼吸（純 CSS，見上方 boot-logo-breathe），中線與系統名不出現
-     ② iframe 完整 load ＋ GAS 回報分流完成 → 這時候才開跑三拍動畫
+        ⚠ 但「淡影」本身也要等 img.decode() 完成才准出現，否則呼吸的是一張半截圖
+     ② logo 解碼完 ＋ iframe 完整 load ＋ GAS 回報分流完成 → 這時候才開跑三拍動畫
      ③ 三拍整段跑完 → 立刻交棒進 APP
    ⛔ 不可把三拍動畫綁回固定延遲（舊版綁版面穩定後 650ms）：那會讓動畫在 GAS 還沒回來時就跑完，
       Logo 接著靜止杵在畫面上等交棒，使用者看到的就是「分兩段載入」。
@@ -262,6 +269,7 @@ var appRouteSettled = false;
 var bootSequenceTimer = null;
 var bootSequenceStarted = false;
 var bootMotionReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var bootLogoSettled = false;
 
 /* 三拍動畫只跑一次，跑完直接交棒；開跑之後不再回頭看任何條件，才不會被中途打斷。 */
 function beginBrandSequence() {
@@ -275,9 +283,9 @@ function beginBrandSequence() {
   bootSequenceTimer = setTimeout(revealApp, bootMotionReduced ? 320 : BRAND_SEQUENCE_MS);
 }
 
-/* iframe 載完、且 GAS 已回報分流，內容才算真的備妥。 */
+/* iframe 載完、GAS 已回報分流，而且品牌圖自己也解碼完了，內容才算真的備妥。 */
 function scheduleBrandSequence() {
-  if (!appFrameLoaded || !appRouteSettled) return;
+  if (!appFrameLoaded || !appRouteSettled || !bootLogoSettled) return;
   beginBrandSequence();
 }
 
@@ -320,6 +328,35 @@ if (appFrame) {
     scheduleBrandSequence();
   });
 }
+/* 品牌圖的解碼閘門。
+   decode() 只在整張圖都能安全上畫時才 resolve，正是我們要的訊號（load 事件也可以，
+   但 decode() 連解碼都算進去，才不會在 8 秒保險燒斷的那一格剛好卡在解碼中）。
+   ⛔ 失敗時「不要」補上 boot-logo-ready：寧可只播中線＋系統名，也不要放半張圖或破圖，
+      三拍照樣要能開跑，所以旗標與 class 是兩件事。
+   圖若晚於 8 秒保險才到，class 補上去後 boot-logo-arrive 會自己補播一次淡入上浮。 */
+(function 等品牌圖真的解碼完() {
+  var logo = document.querySelector('.boot-logo');
+  function 放行(可顯示) {
+    if (bootLogoSettled) return;
+    bootLogoSettled = true;
+    if (可顯示) document.documentElement.classList.add('boot-logo-ready');
+    scheduleBrandSequence();
+  }
+  function 補上圖() {
+    if (!logo || !logo.complete || !logo.naturalWidth) return;
+    document.documentElement.classList.add('boot-logo-ready');
+  }
+  if (!logo) { 放行(false); return; }
+  if (logo.decode) {
+    logo.decode().then(function () { 放行(true); 補上圖(); },
+                       function () { 放行(false); });
+    return;
+  }
+  if (logo.complete && logo.naturalWidth) { 放行(true); return; }
+  logo.addEventListener('load', function () { 放行(true); 補上圖(); });
+  logo.addEventListener('error', function () { 放行(false); });
+})();
+
 brandStartFallback = setTimeout(beginBrandSequence,8000);
 appRevealFallback = setTimeout(revealApp,13000);
 
@@ -670,11 +707,11 @@ window.addEventListener('message', function (e) {
 <script src="ai-scenario-schema.js?v=20260922-10"></script>
 <script src="ai-voice-notes.js?v=20260922-2"></script>
 <script src="ai-scenarios.js?v=20260922-9"></script>
-<script src="ai-live-feedback.js?v=20260922-3"></script>
+<script src="ai-live-feedback.js?v=20260923-1"></script>
 <script src="ai-live-settings.js?v=20260920-3"></script>
 <script src="ai-live-capture.js?v=20260920-1"></script>
 <script src="ai-live-compact.js?v=20260922-3"></script>
 <script src="ai-live-heart.js?v=20260922-4"></script>
-<script src="ai-live-ui.js?v=20260922-9"></script>
+<script src="ai-live-ui.js?v=20260923-1"></script>
 </body>
 </html>

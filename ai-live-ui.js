@@ -191,7 +191,7 @@
     view.feedback = new window.DFAIFeedback(mode);
     const volumeKey = 'defang.ai.volume';
     let volumePercent = 100;
-    try { volumePercent = Math.max(0, Math.min(200, Number(localStorage.getItem(volumeKey)) || 100)); } catch (error) {}
+    try { volumePercent = Math.max(0, Math.min(300, Number(localStorage.getItem(volumeKey)) || 100)); } catch (error) {}
     view.feedback.setVolume(volumePercent);
     view.feedback.volume.addEventListener('input', () => {
       volumePercent = Number(view.feedback.volume.value);
