@@ -1,0 +1,29 @@
+/* 極簡心臟版面：卡片選情境、心臟當唯一視覺，文字只在出錯時出現。 */
+.minimal .model-tag,.minimal .scenario-call-pickers,.minimal .scenario-info,.minimal .audio-feedback{display:none}
+.minimal .status:not(.error){position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.minimal .status.error{font-size:13px}
+.minimal header h1{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.minimal header>div{flex:1;min-width:0}
+
+/* 未選情境：只有卡片。選了就換成心臟。 */
+.minimal:not(.picked) .workspace,.minimal:not(.picked) .controls,.minimal.picked .scenario-cards{display:none}
+.scenario-cards{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-wrap:wrap;justify-content:center;align-content:center;gap:14px;width:100%;max-width:880px;margin:0 auto;padding:4px}
+.scenario-card{flex:0 1 200px;max-width:240px;min-height:108px;display:grid;place-items:center;padding:16px;border:1px solid #cbe4d3;border-radius:22px;background:#fffffff0;font-size:17px;font-weight:600;text-align:center;line-height:1.5;box-shadow:0 6px 18px #2c6a4012;transition:transform .16s,box-shadow .16s,border-color .16s}
+.scenario-card:hover{background:#fff;border-color:#83CF8F;transform:translateY(-2px);box-shadow:0 12px 26px #2c6a401f}
+.scenario-card:active{transform:translateY(0)}
+
+/* 心臟舞台 */
+.minimal .conversation{border:0;background:transparent;overflow:visible}
+.heart-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px}
+.heart{width:min(44vh,60vw,330px);height:auto;max-height:100%;overflow:visible;transform-origin:center;will-change:transform;filter:drop-shadow(0 14px 30px #e4001126)}
+.heart-ecg{fill:none;stroke:#fff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* 文字訊息：開啟時心臟讓位，關閉時完全不占空間。 */
+.minimal .transcript{display:none}
+.minimal.subtitles .transcript{display:block;flex:1;border:1px solid #d0e6d6;border-radius:20px;background:#ffffffcc;margin-top:10px}
+.minimal.subtitles .heart-stage{flex:none;height:clamp(96px,17vh,150px)}
+.minimal.subtitles .heart{width:auto;height:100%}
+.minimal [data-subtitles][aria-pressed=true]{background:#d8efdf}
+
+@media(max-width:650px){.scenario-cards{gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.scenario-card{flex:0 1 150px;min-height:92px;padding:12px;font-size:15px;border-radius:18px}.heart{width:min(38vh,72vw,300px)}}
+@media(max-height:500px){.heart{width:min(46vh,40vw,220px)}.scenario-cards{gap:8px}.scenario-card{min-height:64px;padding:10px 14px;font-size:14px;flex:0 1 170px}}
