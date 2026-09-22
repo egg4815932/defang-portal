@@ -44,7 +44,7 @@
       local: ['本機', '本機設定：只在你的瀏覽器或我們的後端生效，語音模型看不到。']
     };
     const kinds = { voice: 'api', openaiVoice: 'api', detection: 'api', endSensitivity: 'api', prefixMs: 'api',
-      pauseMs: 'api', interruption: 'api', thinking: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
+      pauseMs: 'api', interruption: 'api', thinking: 'api', openaiBrain: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
       automatic: 'api local', subtitles: 'api local', durationMinutes: 'api local',
       requireMaterial: 'local', materialLimit: 'local', echo: 'local', noiseSuppression: 'local',
       autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local' };
@@ -158,7 +158,7 @@
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
-      ['openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
+      ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       const teaching = controls.teaching.value;
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
       Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });

@@ -79,9 +79,11 @@ var DFAISchema = (function () {
   choice('subtitles', '文字字幕', '模型與連線', [['both', '雙方'], ['user', '只有我'], ['model', '只有 AI'], ['off', '關閉']], 'both');
   choice('thinking', '思考深度', '模型與連線', [['LOW', '低'], ['MEDIUM', '中'], ['HIGH', '高']], 'LOW', '只適用 Extended Thinking。');
   // GPT-Live 專用：luna 的思考檔位與單次回答上限；兩項都在 delegation.responses 裡生效。
-  choice('openaiEffort', 'GPT-Live 思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
-  range('openaiMaxTokens', 'GPT-Live 單次回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
-  choice('openaiWebSearch', 'GPT-Live 網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路；每次搜尋約 US$0.01，查回來的內容另計 token。網路資料不等於公司規定。');
+  // 這幾格都是 delegation.responses 的參數：語音層只負責聽與說，推理都在這顆大腦。
+  choice('openaiBrain', '大腦模型', '模型與連線', [['gpt-5.6-luna', 'Luna · 快又便宜'], ['gpt-5.6-terra', 'Terra · ChatGPT App 同級'], ['gpt-6-astra', 'Astra · 旗艦推理，語音會變慢']], 'gpt-5.6-luna', '只適用 GPT-Live-1。一通 10 分鐘的大腦費用約 Luna US$0.03、Terra US$0.27、Astra US$1.30；語音層另計 US$0.05／分鐘。Astra 沒有「不思考」檔位。');
+  choice('openaiEffort', '大腦思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
+  range('openaiMaxTokens', '大腦回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
+  choice('openaiWebSearch', '大腦網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路；每次搜尋約 US$0.01，查回來的內容另計 token。網路資料不等於公司規定。');
   choice('resumption', '斷線接回原對話', '模型與連線', onoff, 'on');
   choice('compression', '長對話自動整理', '模型與連線', onoff, 'on', '開啟後由 API 使用預設整理門檻。');
   range('reconnects', '最多重連次數', '模型與連線', 0, 5, 1, 2, '次');
@@ -116,6 +118,7 @@ var DFAISchema = (function () {
     if (!Array.isArray(offRaw)) throw new Error('指令開關格式不正確');
     // 沒打勾的欄位記在 off；內容照樣保留，只是這次不送出。
     out.off = fields.filter(function (f) { return f.toggle && offRaw.indexOf(f.key) >= 0; }).map(function (f) { return f.key; });
+    if (out.settings.openaiBrain === 'gpt-6-astra' && out.settings.openaiEffort === 'none') throw new Error('Astra 沒有「不思考」檔位，請把大腦思考程度改成低或以上');
     if (out.settings.language === 'custom' && !out.settings.customLanguage) throw new Error('請填自訂語言');
     if (out.settings.autoGreeting === 'on' && !out.settings.opening) throw new Error('請填開場文字，或關閉自動開場');
     if (out.material.length > out.settings.materialLimit) throw new Error('教材超過此情境的字數上限');
