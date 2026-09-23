@@ -66,6 +66,11 @@
       if (request) { clearTimeout(request.timer); request.resolve(m.devices); devices.delete(m.requestId); }
       return;
     }
+    // 錄音在掛斷後才打包好，那時 stop() 已把 client.id 換號；不能被下面的 runId 檢查擋掉。
+    if (m.type === 'callback' && m.name === 'record') {
+      if (client && client.callbacks.record) client.callbacks.record(m.value);
+      return;
+    }
     if (!client || m.runId !== client.id) return;
     if (m.type === 'need-ticket') {
       const id = client.id, getTicket = client.getTicket;
