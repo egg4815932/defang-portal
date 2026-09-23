@@ -23,7 +23,7 @@
     embeddedCss.href = new URL('ai-live-embedded.css?v=20260920-5', assetBase).href; shadow.appendChild(embeddedCss);
   }
   const heartCss = document.createElement('link');
-  heartCss.rel = 'stylesheet'; heartCss.href = new URL('ai-live-heart.css?v=20260923-3', assetBase).href;
+  heartCss.rel = 'stylesheet'; heartCss.href = new URL('ai-live-heart.css?v=20260923-4', assetBase).href;
   shadow.appendChild(heartCss);
   const stylesReady = Promise.all(Array.from(shadow.querySelectorAll('link')).map(link => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('AI 頁面樣式載入逾時，請重新整理後再試')), 20000);

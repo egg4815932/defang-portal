@@ -26,13 +26,10 @@
 .call-left{font-size:21px;font-weight:600;letter-spacing:.04em;color:#2f6b45;line-height:1.2}
 .call-clock.ending .call-left{color:#b3372f}
 .call-note{font-size:12px;color:#77947f}
-/* 撥號中：文字後面跳三個點，掛斷鍵外圈一直擴散，像電話在響。 */
-.call-clock.dialing .call-left{color:#4f7d5d;font-size:17px}
-.call-clock.dialing .call-left::after{content:'';display:inline-block;width:1.4em;text-align:left;animation:dial-dots 1.2s steps(4) infinite}
-@keyframes dial-dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+/* 撥號中：掛斷鍵外圈一直擴散，像電話在響。 */
 .minimal.dialing [data-stop]{animation:dial-ring 1.3s ease-out infinite}
 @keyframes dial-ring{0%{box-shadow:0 0 0 0 #c9423a66}100%{box-shadow:0 0 0 18px #c9423a00}}
-@media(prefers-reduced-motion:reduce){.minimal.dialing [data-stop],.call-clock.dialing .call-left::after{animation:none}.call-clock.dialing .call-left::after{content:'…'}}
+@media(prefers-reduced-motion:reduce){.minimal.dialing [data-stop]{animation:none}}
 .minimal footer{padding-bottom:clamp(10px,5vh,54px)}
 
 /* 文字訊息：開啟時心臟讓位，關閉時完全不占空間。 */

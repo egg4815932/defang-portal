@@ -81,13 +81,7 @@
     let shownLeft = '', shownNote = '', connected = false, dialing = false;
     function showClock() {
       const live = connected && view.callStartedAt && view.callLimitMs;
-      timer.hidden = !live && !dialing;
-      timer.classList.toggle('dialing', dialing);
-      if (dialing) {
-        if (shownLeft !== '撥號中') { shownLeft = '撥號中'; leftText.textContent = shownLeft; noteText.textContent = shownNote = ''; }
-        timer.classList.remove('ending');
-        return;
-      }
+      timer.hidden = !live;
       if (!live) { shownLeft = shownNote = ''; return; }
       const left = Math.max(0, view.callLimitMs - (Date.now() - view.callStartedAt));
       const text = clock(left);
