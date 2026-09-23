@@ -223,7 +223,20 @@
       boostPercent = Number(view.feedback.boost.value);
       try { localStorage.setItem(boostKey, String(boostPercent)); } catch (error) {}
       if (view.client) view.client.inputBoost(boostPercent / 100);
+      if (window.DFAIAudioPrefs) window.DFAIAudioPrefs.save('inputBoost', boostPercent);
       activity();
+    });
+    view.feedback.volume.addEventListener('input', () => { if (window.DFAIAudioPrefs) window.DFAIAudioPrefs.save('volume', volumePercent); });
+    // GAS 內嵌頁的儲存會被 iPhone 隔離或清掉；外殼（App 本體）記得的數值優先。
+    if (window.DFAIAudioPrefs) window.DFAIAudioPrefs.load().then(saved => {
+      if (Number.isFinite(saved.volume) && saved.volume >= 0 && saved.volume <= 300) {
+        volumePercent = saved.volume; view.feedback.setVolume(volumePercent);
+        if (view.client) view.client.volume(volumePercent / 100);
+      }
+      if (Number.isFinite(saved.inputBoost) && saved.inputBoost >= 50 && saved.inputBoost <= 300) {
+        boostPercent = saved.inputBoost; view.feedback.setBoost(boostPercent);
+        if (view.client) view.client.inputBoost(boostPercent / 100);
+      }
     });
     page.querySelector('.conversation').prepend(view.feedback.element);
     view.capture = new window.DFAICapture(async () => {

@@ -60,6 +60,24 @@
       } catch (error) { if (nonce === requestNonce) send('devices', { requestId: m.requestId, devices: [] }); }
       return;
     }
+    // 播放音量／收音放大記在外殼：GAS 內嵌頁的儲存在 iPhone 上會被隔離或清掉。
+    if (m.command === 'prefs') {
+      const prefs = {};
+      try {
+        ['volume', 'inputBoost'].forEach(name => {
+          const value = localStorage.getItem('defang.ai.' + name);
+          if (value !== null && Number.isFinite(Number(value))) prefs[name] = Number(value);
+        });
+      } catch (error) {}
+      send('prefs', { requestId: m.requestId, prefs });
+      return;
+    }
+    if (m.command === 'prefs-save') {
+      if ((m.name === 'volume' || m.name === 'inputBoost') && Number.isFinite(Number(m.value))) {
+        try { localStorage.setItem('defang.ai.' + m.name, String(Number(m.value))); } catch (error) {}
+      }
+      return;
+    }
     if (m.command === 'start') {
       stop(); runId = m.runId;
       const id = runId, bindNonce = nonce;

@@ -5,6 +5,7 @@
   let client, sequence = 0;
   const devices = new Map();
   const sessionClosers = new Map();
+  const prefRequests = new Map();
   class ProxyClient {
     constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.id = 0; this.boost = 1; client = this; }
     async start(getTicket, deviceId, settings) {
@@ -66,6 +67,11 @@
       if (request) { clearTimeout(request.timer); request.resolve(m.devices); devices.delete(m.requestId); }
       return;
     }
+    if (m.type === 'prefs') {
+      const request = prefRequests.get(m.requestId);
+      if (request) { clearTimeout(request.timer); request.resolve(m.prefs || {}); prefRequests.delete(m.requestId); }
+      return;
+    }
     // 錄音在掛斷後才打包好，那時 stop() 已把 client.id 換號；不能被下面的 runId 檢查擋掉。
     if (m.type === 'callback' && m.name === 'record') {
       if (client && client.callbacks.record) client.callbacks.record(m.value);
@@ -92,5 +98,14 @@
     const timer = setTimeout(() => { devices.delete(requestId); resolve([]); }, 5000);
     devices.set(requestId, { resolve, timer }); bridge.audio({ command: 'devices', requestId });
   });
+  // 滑桿記憶存在外殼（App 本體），外殼沒回應就當作沒存過。
+  window.DFAIAudioPrefs = {
+    load: () => new Promise(resolve => {
+      const requestId = String(++sequence);
+      const timer = setTimeout(() => { prefRequests.delete(requestId); resolve({}); }, 5000);
+      prefRequests.set(requestId, { resolve, timer }); bridge.audio({ command: 'prefs', requestId });
+    }),
+    save: (name, value) => bridge.audio({ command: 'prefs-save', name, value })
+  };
   window.DFLiveClient = ProxyClient;
 })();
