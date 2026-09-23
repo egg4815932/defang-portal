@@ -80,6 +80,17 @@
         它救不了半截 LOGO（淡影畫的是同一張沒收完的圖），又把啟動拆成
         「淡影」與「三拍」兩段。等待期什麼都不給，才符合這頁一開始就寫的
         「不加遮罩、假進度或等待動畫」。 */
+  /* 等待期的讀取條（2026-09-23 使用者指示加回：網路慢時純薄荷底會像當機）。
+     只在「還沒開跑三拍」時出現；三拍一開跑就淡出，Logo 動畫照舊從零開始。
+     進度＝三個真實關卡（品牌圖／iframe load／GAS 分流）＋關卡之間緩慢爬升，永遠停在 95% 前。 */
+  .boot-progress{position:absolute;z-index:1;left:50%;top:50%;width:min(180px,44vw);height:3px;margin-left:calc(min(180px,44vw)/-2);
+    border-radius:3px;background:rgba(43,126,67,.12);opacity:0;
+    animation:boot-progress-in .4s ease .25s forwards;transition:opacity .35s ease}
+  .boot-progress i{display:block;height:100%;width:100%;border-radius:inherit;background:#83CF8F;
+    transform-origin:left;transform:scaleX(.04);transition:transform .45s cubic-bezier(.22,.78,.28,1)}
+  .boot-progress-text{position:absolute;left:0;right:0;top:12px;text-align:center;color:#4F7A5B;font-size:12px;letter-spacing:.2em;white-space:nowrap}
+  @keyframes boot-progress-in{to{opacity:1}}
+  html.boot-brand-ready .boot-progress{animation:none;opacity:0}
   .boot-rule{width:46px;height:1px;margin:24px 0 17px;opacity:0;transform-origin:center;
     background:linear-gradient(90deg,transparent,rgba(43,126,67,.42),transparent)}
   .boot-name{color:#1E4229;font-size:clamp(13px,1.45vw,16px);font-weight:500;letter-spacing:.42em;text-indent:.42em;opacity:0}
@@ -219,6 +230,7 @@
 <body>
   <main id="bootStage" role="status" aria-label="德芳連鎖藥局內部查詢系統啟動中">
     <div class="boot-backdrop" aria-hidden="true"></div>
+    <div class="boot-progress" aria-hidden="true"><i></i><div class="boot-progress-text">載入中…</div></div>
     <div class="boot-lockup">
       <img class="boot-logo" src="logo-brand.png" width="827" height="105" decoding="async" alt="德芳連鎖藥局">
       <div class="boot-rule" aria-hidden="true"></div>
@@ -269,6 +281,7 @@ function beginBrandSequence() {
   if (document.documentElement.classList.contains('app-ready')) return;
   if (!document.getElementById('bootStage')) return;
   bootSequenceStarted = true;
+  tickBootProgress();
   clearTimeout(brandStartFallback);
   document.documentElement.classList.add('boot-brand-ready');
   clearTimeout(bootSequenceTimer);
@@ -276,7 +289,27 @@ function beginBrandSequence() {
 }
 
 /* iframe 載完、GAS 已回報分流，而且品牌圖自己也解碼完了，內容才算真的備妥。 */
+var bootProgressShown = 0;
+var bootProgressTimer = null;
+function bootProgressTarget() {
+  return 0.08 + (bootLogoSettled ? 0.14 : 0) + (appFrameLoaded ? 0.38 : 0) + (appRouteSettled ? 0.4 : 0);
+}
+function tickBootProgress() {
+  var bar = document.querySelector('.boot-progress i');
+  if (!bar) return;
+  var done = bootProgressTarget();
+  if (bootSequenceStarted || done >= 1) { bootProgressShown = 1; clearInterval(bootProgressTimer); }
+  else {
+    var limit = Math.min(0.95, done + 0.3);
+    bootProgressShown = Math.max(bootProgressShown, done);
+    bootProgressShown += (limit - bootProgressShown) * 0.06;
+  }
+  bar.style.transform = 'scaleX(' + bootProgressShown.toFixed(3) + ')';
+}
+bootProgressTimer = setInterval(tickBootProgress, 300);
+
 function scheduleBrandSequence() {
+  tickBootProgress();
   if (!appFrameLoaded || !appRouteSettled || !bootLogoSettled) return;
   beginBrandSequence();
 }
