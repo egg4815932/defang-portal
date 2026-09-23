@@ -43,6 +43,6 @@
 @media(max-height:500px){.heart{width:min(52vh,42vw,250px)}.minimal footer{padding-bottom:6px}.call-clock{flex-direction:column;gap:0;align-items:center}.call-left{font-size:17px}.scenario-cards{gap:8px}.scenario-card{min-height:64px;padding:10px 14px;font-size:14px;flex:0 1 170px}}
 
 /* 右上角的文字／耳機鍵：往下挪、放大，手指比較好按。 */
-.minimal header{padding-top:10px}
+.minimal header{padding-top:20px}
 .minimal header .icon-button{width:54px;height:54px;min-width:54px;min-height:54px}
 .minimal header .icon-button .ui-icon{width:30px;height:30px}

@@ -7,5 +7,5 @@
 .page>header [data-close]{display:none}
 .scenario-page>header [data-use]{font-size:13px;min-height:36px;padding:5px 10px}
 @media(max-width:650px){.page{padding-top:58px}.page>header{gap:4px;padding-right:10px}.page>header h1{font-size:15px}.model-tag{font-size:10px}.compact header .icon-button{width:40px;min-width:40px}.scenario-page>header{flex-wrap:nowrap}.scenario-page>header>div{min-width:0}.scenario-page>header [data-use]{font-size:12px;padding:4px 6px;white-space:nowrap}}
-/* 心臟版右上鍵放大後標題列約 65px，內容跟著往下讓，不被蓋住。 */
-.page.minimal{padding-top:74px}
+/* 心臟版右上鍵放大後標題列約 75px，內容跟著往下讓，不被蓋住。 */
+.page.minimal{padding-top:84px}
