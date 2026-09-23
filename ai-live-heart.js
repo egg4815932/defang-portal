@@ -66,6 +66,8 @@
       '<linearGradient id="heart-fill-' + view.mode + '" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="#F32232"/><stop offset="1" stop-color="#C3000E"/></linearGradient></defs>' +
       '<path class="heart-body" fill="url(#heart-fill-' + view.mode + ')" d="' + HEART + '"/>' +
+      // 未接通的灰色疊在紅色上面，接通時淡出；不用 CSS filter，Safari 改 filter 常常不重畫。
+      '<path class="heart-idle" d="' + HEART + '"/>' +
       '<g clip-path="url(#heart-clip-' + view.mode + ')"><path class="heart-ecg" d="M0 ' + MID + 'H' + SPAN + '"/></g></svg>';
     page.querySelector('.conversation').prepend(stage);
     const heart = stage.querySelector('.heart'), ecg = stage.querySelector('.heart-ecg');
@@ -76,10 +78,16 @@
     timer.hidden = true;
     page.querySelector('.controls').before(timer);
     const leftText = timer.querySelector('.call-left'), noteText = timer.querySelector('.call-note');
-    let shownLeft = '', shownNote = '', connected = false;
+    let shownLeft = '', shownNote = '', connected = false, dialing = false;
     function showClock() {
       const live = connected && view.callStartedAt && view.callLimitMs;
-      timer.hidden = !live;
+      timer.hidden = !live && !dialing;
+      timer.classList.toggle('dialing', dialing);
+      if (dialing) {
+        if (shownLeft !== '撥號中') { shownLeft = '撥號中'; leftText.textContent = shownLeft; noteText.textContent = shownNote = ''; }
+        timer.classList.remove('ending');
+        return;
+      }
       if (!live) { shownLeft = shownNote = ''; return; }
       const left = Math.max(0, view.callLimitMs - (Date.now() - view.callStartedAt));
       const text = clock(left);
@@ -109,6 +117,7 @@
       // 聲音越大，心搏越高也越密；沒聲音就不再排新的心搏。
       if (!queue.length) {
         if (cooldown > 0) cooldown--;
+        else if (dialing) { queue = PULSE.slice(); amplitude = 12; cooldown = 34; }
         else if (inputLevel > 0.04) { queue = PULSE.slice(); amplitude = inputLevel * 30; cooldown = Math.round(15 - inputLevel * 9); }
       }
       buffer.copyWithin(0, 1);
@@ -119,7 +128,9 @@
       }
       ecg.setAttribute('d', path);
       // 跟著 AI 的音量起伏：衝上去快、放掉慢，看起來才像被聲音推的。
-      const target = connected ? Math.min(1, outputLevel * 1.2) : 0;
+      // 撥號中：灰心慢慢呼吸，讓人知道正在接。
+      const target = connected ? Math.min(1, outputLevel * 1.2)
+        : dialing && !calm ? 0.12 + 0.12 * Math.sin(now / 260) : 0;
       const ease = 1 - Math.pow(1 - (target > pulse ? 0.45 : 0.10), delta * 60 || 1);
       pulse += (target - pulse) * ease;
       heart.style.transform = 'scale(' + (1 + pulse * SWELL).toFixed(4) + ')';
@@ -135,8 +146,10 @@
 
     function apply() {
       connected = !!(view.busy && !view.testing && view.client && view.client.run && view.client.run.ready);
+      dialing = !!(view.busy && !view.testing && !connected);
       page.classList.toggle('picked', picked);
       page.classList.toggle('call-live', connected);
+      page.classList.toggle('dialing', dialing);
       showClock();
       tick();
     }
