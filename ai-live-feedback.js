@@ -19,7 +19,11 @@
         '<label class="volume-label" for="vol-' + mode + '">播放音量</label>' +
         '<input id="vol-' + mode + '" type="range" data-volume min="0" max="300" step="10" value="100">' +
         '<output for="vol-' + mode + '" data-volume-value>100%</output>' +
-        '<span class="note volume-note">手機的音量鍵在通話中指向「通話音量」，這條滑桿只管 AI 的聲音；超過 100% 會再放大，太大聲可能破音。</span></div>' +
+        '<span class="note volume-note">手機的音量鍵在通話中指向「通話音量」，這條滑桿只管 AI 的聲音；超過 100% 會再放大，太大聲可能破音。</span>' +
+        '<label class="volume-label" for="boost-' + mode + '">收音放大</label>' +
+        '<input id="boost-' + mode + '" type="range" data-boost min="50" max="300" step="10" value="100">' +
+        '<output for="boost-' + mode + '" data-boost-value>100%</output>' +
+        '<span class="note volume-note">放大送給 AI 的麥克風聲音；超過 100% 時，太大聲的尖峰會自動圓滑壓低，不會硬切成破音。</span></div>' +
         '<div class="audio-meters"><div class="meter meter-user"><div class="meter-head"><b>你的聲音</b><span data-input-label>等待聲音</span></div>' +
         '<div class="input-wave" aria-hidden="true">' + '<i></i>'.repeat(24) + '</div></div>' +
         '<div class="meter meter-ai"><div class="meter-head"><b>Gemini 的聲音</b><span data-output-label>等待回覆</span></div>' +
@@ -29,6 +33,9 @@
       this.volume = this.element.querySelector('[data-volume]');
       this.volumeValue = this.element.querySelector('[data-volume-value]');
       this.volume.addEventListener('input', () => this.showVolume());
+      this.boost = this.element.querySelector('[data-boost]');
+      this.boostValue = this.element.querySelector('[data-boost-value]');
+      this.boost.addEventListener('input', () => this.showBoost());
       this.deviceLabel = this.element.querySelector('.mic-device');
       this.test = this.element.querySelector('[data-test-mic]');
       this.resume = this.element.querySelector('[data-resume]');
@@ -45,6 +52,8 @@
     }
     showVolume() { this.volumeValue.textContent = this.volume.value + '%'; }
     setVolume(percent) { this.volume.value = String(percent); this.showVolume(); }
+    showBoost() { this.boostValue.textContent = this.boost.value + '%'; }
+    setBoost(percent) { this.boost.value = String(percent); this.showBoost(); }
     async devices() {
       if (!window.DFAIAudioDevices && (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices)) return;
       try {

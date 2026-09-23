@@ -17,11 +17,32 @@
     for (let i = 0; i < samples.length; i++) samples[i] = view.getInt16(i * 2, true) / 32768;
     return samples;
   }
+  // 收音放大＋軟限幅：放大後的尖峰圓滑壓在 0.95 以內，不會被硬切成破音。
+  // WaveShaper 只吃 ±1，所以先縮成 1/4 再由曲線放回，300% 也碰不到曲線邊界。
+  const BOOST_ROOM = 4;
+  function micBoost(context) {
+    const gain = context.createGain(), shaper = context.createWaveShaper(), curve = new Float32Array(4097);
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / 2048 - 1) * BOOST_ROOM, a = Math.abs(x);
+      curve[i] = Math.sign(x) * (a <= 0.7 ? a : 0.7 + 0.25 * Math.tanh((a - 0.7) / 0.25));
+    }
+    shaper.curve = curve;
+    gain.connect(shaper);
+    return { input: gain, output: shaper, set(value) { gain.gain.value = value / BOOST_ROOM; },
+      disconnect() { gain.disconnect(); shaper.disconnect(); } };
+  }
+  function boostValue(value) {
+    const v = Number(value);
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(3, v)) : 1;
+  }
+  root.DFMicBoost = micBoost;
+  root.DFMicBoostValue = boostValue;
   class LiveClient {
     constructor(callbacks, processorUrl) {
       this.callbacks = callbacks;
       this.processorUrl = processorUrl;
       this.gain = 1;
+      this.boost = 1;
       this.run = null;
     }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
@@ -93,7 +114,8 @@
             this.emit('inputPCM', { buffer: event.data, sent: true });
           }
         };
-        run.input.connect(run.processor);
+        run.boost = micBoost(run.context); run.boost.set(this.boost);
+        run.input.connect(run.boost.input); run.boost.output.connect(run.processor);
         run.processor.connect(run.context.destination);
         run.output = run.context.createAnalyser();
         run.output.fftSize = 1024;
@@ -261,6 +283,10 @@
       this.gain = Math.max(0, Math.min(3, Number(value) || 0));
       if (this.run && this.run.volume) this.run.volume.gain.value = this.gain;
     }
+    inputBoost(value) {
+      this.boost = boostValue(value);
+      if (this.run && this.run.boost) this.run.boost.set(this.boost);
+    }
     resumeAudio() {
       const run = this.run;
       if (!run) return;
@@ -301,6 +327,7 @@
       if (run.stream) run.stream.getTracks().forEach(track => { track.onended = null; track.stop(); });
       if (run.processor) { run.processor.port.onmessage = null; run.processor.onprocessorerror = null; run.processor.disconnect(); }
       if (run.input) run.input.disconnect();
+      if (run.boost) run.boost.disconnect();
       this.clearAudio(run);
       if (run.player) { run.player.port.onmessage = null; run.player.onprocessorerror = null; run.player.disconnect(); }
       if (run.output) run.output.disconnect();

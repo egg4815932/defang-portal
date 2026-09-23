@@ -6,7 +6,7 @@
   const devices = new Map();
   const sessionClosers = new Map();
   class ProxyClient {
-    constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.id = 0; client = this; }
+    constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.id = 0; this.boost = 1; client = this; }
     async start(getTicket, deviceId, settings) {
       this.stop();
       const id = ++sequence; this.id = id; this.getTicket = getTicket;
@@ -20,7 +20,7 @@
           if (this.callbacks.ended) this.callbacks.ended();
           if (this.callbacks.error) this.callbacks.error('App 收音服務未連上，請關閉 App 後重新開啟');
         }, 60000);
-        bridge.audio({ command: 'start', runId: id, testing: !getTicket, deviceId, settings });
+        bridge.audio({ command: 'start', runId: id, testing: !getTicket, deviceId, settings, inputBoost: this.boost });
       });
     }
     stop() {
@@ -38,6 +38,7 @@
     }
     resumeAudio() { if (this.run) bridge.audio({ command: 'resumeAudio', runId: this.id }); }
     volume(value) { bridge.audio({ command: 'volume', runId: this.id, value }); }
+    inputBoost(value) { this.boost = value; if (this.id) bridge.audio({ command: 'inputBoost', runId: this.id, value }); }
     manualTurn() {
       if (!this.run || !this.run.ready || this.run.muted) return false;
       this.run.manualSpeaking = !this.run.manualSpeaking;

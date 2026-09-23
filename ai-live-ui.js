@@ -215,6 +215,16 @@
       if (view.client) view.client.volume(volumePercent / 100);
       activity();
     });
+    const boostKey = 'defang.ai.inputBoost';
+    let boostPercent = 100;
+    try { boostPercent = Math.max(50, Math.min(300, Number(localStorage.getItem(boostKey)) || 100)); } catch (error) {}
+    view.feedback.setBoost(boostPercent);
+    view.feedback.boost.addEventListener('input', () => {
+      boostPercent = Number(view.feedback.boost.value);
+      try { localStorage.setItem(boostKey, String(boostPercent)); } catch (error) {}
+      if (view.client) view.client.inputBoost(boostPercent / 100);
+      activity();
+    });
     page.querySelector('.conversation').prepend(view.feedback.element);
     view.capture = new window.DFAICapture(async () => {
       if (current !== view || view.capture.active) return;
@@ -272,6 +282,7 @@
       inputState: state => view.feedback.state(state),
       device: info => view.feedback.device(info)
     }, new URL('ai-live-processor.js?v=20260919-1', assetBase).href);
+    view.client.inputBoost(boostPercent / 100);
     view.start.addEventListener('click', async () => {
       if (view.busy || current !== view) return;
       if (scenarios.loading) { status(view, '情境載入中，請稍候'); return; }

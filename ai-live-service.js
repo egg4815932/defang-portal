@@ -83,6 +83,7 @@
       });
       const Client = !m.testing && m.settings && m.settings.provider === 'openai' ? window.DFOpenAILiveClient : window.DFLiveClient;
       client = new Client(callbacks, new URL('ai-live-processor.js?v=20260919-1', assets).href);
+      if (m.inputBoost != null && client.inputBoost) client.inputBoost(m.inputBoost);
       const getTicket = m.testing ? null : options => new Promise((resolve, reject) => {
         if (options && options.action === 'close') {
           send('close-session', { runId: id, sessionId: options.sessionId }); resolve({ closed: true }); return;
@@ -109,6 +110,7 @@
     else if (m.command === 'prompt' && typeof m.text === 'string') client.prompt(m.text);
     else if (m.command === 'resumeAudio') client.resumeAudio();
     else if (m.command === 'volume' && client.volume) client.volume(m.value);
+    else if (m.command === 'inputBoost' && client.inputBoost) client.inputBoost(m.value);
     else if (m.command === 'manualTurn') { client.manualTurn(); send('run', { runId, run: snapshot() }); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });

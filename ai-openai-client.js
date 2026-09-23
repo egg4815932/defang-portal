@@ -16,7 +16,7 @@
     return name ? text + '［' + name + constraint + '］' : text;
   }
   class OpenAILiveClient {
-    constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.gain = 1; }
+    constructor(callbacks) { this.callbacks = callbacks; this.run = null; this.gain = 1; this.boost = 1; }
     emit(name, value) { if (this.callbacks[name]) this.callbacks[name](value); }
     async start(getTicket, deviceId, settings) {
       this.stop();
@@ -48,7 +48,11 @@
         this.emit('device', { label: track.label || '系統預設麥克風', id: track.getSettings ? track.getSettings().deviceId : '' });
         track.onended = () => { if (current()) this.fail(run, '麥克風已中斷，請重新開始'); };
         run.input = run.context.createMediaStreamSource(stream);
-        run.meter = run.context.createAnalyser(); run.meter.fftSize = 1024; run.input.connect(run.meter);
+        run.meter = run.context.createAnalyser(); run.meter.fftSize = 1024;
+        // 放大後另開一條音軌；100% 時仍直接送原始麥克風音軌，行為跟以前一模一樣。
+        run.boost = root.DFMicBoost(run.context); run.boost.set(this.boost);
+        run.boosted = run.context.createMediaStreamDestination();
+        run.input.connect(run.boost.input); run.boost.output.connect(run.meter); run.boost.output.connect(run.boosted);
         // Apple 的 WebAudio 對遠端音軌不可靠，由 <audio> 出聲；其餘平台走 WebAudio，音量才能放大到系統上限以上。
         run.viaElement = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         // analyser 放在音量之前：音波反映 AI 實際在說話，不隨滑桿變平。
@@ -86,7 +90,8 @@
         };
         // 等 session.started 才放行收音；不使用 Gemini 的音量截音或手動分段。
         track.enabled = false;
-        pc.addTrack(track, stream);
+        run.sender = pc.addTrack(track, stream);
+        this.applyBoost(run);
         const dc = run.channel = pc.createDataChannel('oai-events');
         dc.onmessage = event => {
           let data;
@@ -202,6 +207,17 @@
       this.gain = Math.max(0, Math.min(3, Number(value) || 0));
       if (this.run) this.applyVolume(this.run);
     }
+    applyBoost(run) {
+      if (!run.sender || !run.boost) return;
+      run.boost.set(this.boost);
+      const next = this.boost === 1 ? run.stream.getAudioTracks()[0] : run.boosted.stream.getAudioTracks()[0];
+      if (run.sender.track === next) return;
+      run.sender.replaceTrack(next).catch(error => { if (this.run === run) this.emit('state', '收音放大切換失敗，維持原本音量［' + (error && error.name || '未知') + '］'); });
+    }
+    inputBoost(value) {
+      this.boost = root.DFMicBoostValue(value);
+      if (this.run) this.applyBoost(this.run);
+    }
     resumeAudio() { if (!this.run) return; this.run.context.resume().catch(() => {}); this.play(this.run); }
     // 到點提醒：插一句應用指令，語音層與被委派的大腦都收得到。
     // 沒設提醒的情境，後端不會把這條事件放進白名單，送出去只會換來 error，所以先擋住。
@@ -222,7 +238,8 @@
       if (run.brain) run.brain.reset();
       if (run.stream) run.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
-      [run.input, run.meter, run.remote, run.output, run.volume].forEach(n => { if (n) n.disconnect(); });
+      [run.input, run.meter, run.remote, run.output, run.volume, run.boost].forEach(n => { if (n) n.disconnect(); });
+      if (run.boosted) run.boosted.stream.getTracks().forEach(t => t.stop());
       if (run.context) run.context.close().catch(() => {});
       this.emit('inputLevel', { level: 0, bands: [] }); this.emit('outputLevel', { level: 0, bands: [] }); this.emit('inputState', 'idle');
       run.cleanupTransport = () => {
