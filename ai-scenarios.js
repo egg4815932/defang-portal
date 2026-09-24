@@ -20,8 +20,8 @@
       '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label></div>' +
       '<p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
       '<div class="scenario-legend">每格的標記：' +
-      '<span><span class="field-badge badge-api">API</span>送進連線設定，一定照做</span>' +
-      '<span><span class="field-badge badge-prompt">指令</span>串成文字唸給模型，盡量照做</span>' +
+      '<span><span class="field-badge badge-api">API</span>系統開關，一定照做</span>' +
+      '<span><span class="field-badge badge-prompt">指令</span>寫進說明書，模型盡量照做</span>' +
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
       '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
@@ -39,8 +39,8 @@
     const groups = new Map();
     // 每格走哪條路：api＝打包進連線設定，prompt＝串成文字唸給模型，local＝只在瀏覽器／後端生效。
     const kindText = {
-      api: ['API', 'API 參數：打包進連線設定送出，機器層級一定照做。'],
-      prompt: ['指令', '文字指令：串成一段話唸給模型聽，它會盡量照做，但不保證。'],
+      api: ['API', '系統開關：建立通話時直接設定，系統一定照做。'],
+      prompt: ['指令', '寫進說明書（instructions）：模型讀了會盡量照做，但不保證。不會出現在對話裡。'],
       local: ['本機', '本機設定：只在你的瀏覽器或我們的後端生效，語音模型看不到。']
     };
     const kinds = { voice: 'api', openaiVoice: 'api', detection: 'api', endSensitivity: 'api', prefixMs: 'api',
