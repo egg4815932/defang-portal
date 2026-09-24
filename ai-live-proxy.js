@@ -31,6 +31,11 @@
       this.run = null; this.id = ++sequence;
     }
     prompt(text) { if (this.run) bridge.audio({ command: 'prompt', runId: this.id, text }); }
+    // 實驗面板：結果由外殼以 lab 事件傳回來。
+    lab(kind, text) {
+      if (!this.run) { if (this.callbacks.lab) this.callbacks.lab({ kind: 'sent', channel: kind, why: '還沒開始通話' }); return; }
+      bridge.audio({ command: 'lab', runId: this.id, kind, text });
+    }
     mute(value) {
       if (!this.run) return;
       this.run.muted = value;

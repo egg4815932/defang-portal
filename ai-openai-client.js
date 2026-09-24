@@ -93,6 +93,7 @@
         run.sender = pc.addTrack(track, stream);
         this.applyBoost(run);
         const dc = run.channel = pc.createDataChannel('oai-events');
+        const lab = value => { if (run.settings && run.settings.labReady) this.emit('lab', value); };
         dc.onmessage = event => {
           let data;
           try { data = JSON.parse(event.data); } catch (error) { return; }
@@ -116,11 +117,20 @@
             if (run.brain) run.brain.note(role, data.delta, newLine);
             this.emit('text', { role, text: data.delta, newLine }); this.emit('activity');
           } else if (data.type === 'session.instructions.appended') {
-            this.emit('activity');
+            this.emit('activity'); lab({ kind: 'ack', type: data.type });
+          } else if (data.type === 'session.thinking.appended' || data.type === 'session.commentary.appended') {
+            lab({ kind: 'ack', type: data.type });
+          } else if (data.type === 'session.usage.updated') {
+            const usage = data.usage || {}, windowUse = data.context_window || {};
+            lab({ kind: 'usage', seconds: usage.seconds, ratio: windowUse.usage_ratio });
           } else if (data.type === 'session.delegation.created' && run.brain) {
             run.brain.request(data.delegation && data.delegation.id, payload => {
               if (dc.readyState === 'open') dc.send(JSON.stringify(payload));
             });
+          } else if (data.type === 'error' && run.settings && run.settings.labReady && /^lab_/.test(String(data.error && data.error.client_event_id))) {
+            // 實驗面板自己送的指令被拒只記在面板上；官方說指令錯誤不一定會關掉通話，所以不掛斷。
+            const error = data.error;
+            lab({ kind: 'error', id: error.client_event_id, code: String(error.code || ''), message: String(error.message || '').slice(0, 300) });
           } else if (data.type === 'error') {
             const code = data.error && data.error.code;
             this.fail(run, 'GPT-Live 回報錯誤' + (typeof code === 'string' && /^[a-z_]{3,80}$/.test(code) ? '：' + code : '，請重新開始'));
@@ -229,6 +239,32 @@
       if (!run.channel || run.channel.readyState !== 'open') return;
       run.channel.send(JSON.stringify({ type: 'session.instructions.append',
         event_id: 'nudge_' + Date.now(), delegation_id: null, content: text }));
+    }
+    // 實驗面板：手動試各條背景管道。後端只在情境打勾時開白名單，labReady 必須跟它一致。
+    // 結果一律發 lab 事件（送出的 event_id 或送不出去的 why），App 內嵌時才傳得回 GAS 面板。
+    lab(kind, text) {
+      const result = this.labSend(kind, text);
+      this.emit('lab', Object.assign({ kind: 'sent', channel: kind }, result));
+      return result;
+    }
+    labSend(kind, text) {
+      const run = this.run;
+      if (!run || !(run.settings || {}).labReady) return { why: '這個情境沒開實驗面板' };
+      if (!run.ready) return { why: '還沒接通' };
+      if (!run.channel || run.channel.readyState !== 'open') return { why: '通話通道已關' };
+      if (typeof text !== 'string' || !text.trim()) return { why: '請先輸入文字' };
+      const id = 'lab_' + kind + '_' + Date.now();
+      const append = { rule: 'session.instructions.append', quiet: 'session.thinking.append', say: 'session.commentary.append' }[kind];
+      if (append) {
+        run.channel.send(JSON.stringify({ type: append, event_id: id, delegation_id: null, content: text }));
+        return { id, types: [append] };
+      }
+      if (kind !== 'ask') return { why: '不認得的管道' };
+      if (run.brain) return { why: 'Gemini 大腦由我們自己接，偷問大腦不適用' };
+      run.channel.send(JSON.stringify({ type: 'response.item.create', event_id: id,
+        item: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }));
+      run.channel.send(JSON.stringify({ type: 'response.create', event_id: id + '_run' }));
+      return { id, types: ['response.item.create', 'response.create'] };
     }
     manualTurn() { return false; }
     fail(run, message) { if (this.run !== run) return; this.stop(); this.emit('ended'); this.emit('error', message); }

@@ -87,7 +87,7 @@
       let begun = false;
       const model = (m.settings && m.settings.model) || '';
       const callbacks = {};
-      ['state', 'device', 'inputLevel', 'inputPCM', 'outputLevel', 'inputState', 'ready', 'ended', 'error', 'text', 'turn', 'activity'].forEach(name => {
+      ['state', 'device', 'inputLevel', 'inputPCM', 'outputLevel', 'inputState', 'ready', 'ended', 'error', 'text', 'turn', 'activity', 'lab'].forEach(name => {
         callbacks[name] = value => {
           if (name === 'ended' && !begun) return;
           if (name === 'state') begun = true;
@@ -132,6 +132,9 @@
     } else if (m.command === 'stop') stop();
     else if (m.command === 'mute') { client.mute(!!m.value); if (recorder) recorder.mute(!!m.value); send('run', { runId, run: snapshot() }); }
     else if (m.command === 'prompt' && typeof m.text === 'string') client.prompt(m.text);
+    else if (m.command === 'lab' && typeof m.kind === 'string' && typeof m.text === 'string') {
+      if (client.lab) client.lab(m.kind, m.text); else send('callback', { runId, name: 'lab', value: { kind: 'sent', channel: m.kind, why: '這個模型沒有實驗面板' }, run: snapshot() });
+    }
     else if (m.command === 'resumeAudio') client.resumeAudio();
     else if (m.command === 'volume' && client.volume) client.volume(m.value);
     else if (m.command === 'inputBoost' && client.inputBoost) client.inputBoost(m.value);

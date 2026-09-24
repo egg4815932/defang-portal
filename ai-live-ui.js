@@ -293,7 +293,8 @@
       inputPCM: event => view.capture.add(event),
       outputLevel: event => view.feedback.level('output', event),
       inputState: state => view.feedback.state(state),
-      device: info => view.feedback.device(info)
+      device: info => view.feedback.device(info),
+      lab: value => { if (view.lab) view.lab.event(value); }
     }, new URL('ai-live-processor.js?v=20260919-1', assetBase).href);
     view.client.inputBoost(boostPercent / 100);
     view.start.addEventListener('click', async () => {
@@ -314,6 +315,9 @@
       view.sessionNudge = scene.settings.nudgeMinutes > 0 && nudgeText
         ? { at: scene.settings.nudgeMinutes * 60000, text: nudgeText } : null;
       view.sessionSettings.nudgeReady = !!view.sessionNudge || opening === 'system';
+      // 實驗面板：要跟後端 openaiLab 開的白名單一致。
+      view.sessionSettings.labReady = scene.model === 'gpt-live-1' && scene.settings.openaiLab === 'on';
+      if (view.lab) view.lab.session(view.sessionSettings.labReady, window.DFAISchema.geminiBrains.indexOf(scene.settings.openaiBrain) >= 0);
       view.callLimitMs = scene.settings.durationMinutes * 60000;
       view.callStartedAt = 0; view.nudgeSentAt = 0;
       if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';
@@ -366,6 +370,7 @@
     page.querySelector('.controls').prepend(view.manual);
     page.querySelector('header').after(scenarios.picker, scenarios.info);
     view.compact = window.DFAIHeart(view, view.compact);
+    if (window.DFAILab) view.lab = window.DFAILab(view);
     empty(); status(view, view.status.textContent);
     controls(view, false, false);
     return view;

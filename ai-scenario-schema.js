@@ -85,6 +85,7 @@ var DFAISchema = (function () {
   choice('openaiEffort', '大腦思考程度', '模型與連線', [['none', '不思考（最快）'], ['low', '低'], ['medium', '中（預設）'], ['high', '高'], ['xhigh', '很高'], ['max', '最高']], 'medium', '只適用 GPT-Live-1。思考用掉的 token 也算進下方的回答長度上限；xhigh 與 max 在語音對話會明顯延遲。');
   range('openaiMaxTokens', '大腦回答長度上限', '模型與連線', 256, 4096, 256, 512, 'token', '只適用 GPT-Live-1。含思考 token；512 約 350～450 個中文字。');
   choice('openaiWebSearch', '大腦網路搜尋', '模型與連線', onoff, 'on', '只適用 GPT-Live-1。開啟後遇到教材沒有的問題可即時查網路：OpenAI 大腦每次搜尋約 US$0.01，Gemini 大腦改用 Google 搜尋接地、費用依你的 Google 方案。真的查了的時候畫面會說一聲。網路資料不等於公司規定。');
+  choice('openaiLab', '實驗面板', '模型與連線', onoff, 'off', '只適用 GPT-Live-1，開發測試用，平常請關閉。開啟後通話頁右上角多一個「實驗」按鈕，可在通話中手動送：加規則、安靜補資料、給它講（會改寫）、偷問大腦（Gemini 大腦不能用），並顯示上下文用量。改設定（session.update）永遠不開。');
   choice('resumption', '斷線接回原對話', '模型與連線', onoff, 'on');
   choice('compression', '長對話自動整理', '模型與連線', onoff, 'on', '開啟後由 API 使用預設整理門檻。');
   range('reconnects', '最多重連次數', '模型與連線', 0, 5, 1, 2, '次');

@@ -44,7 +44,7 @@
       local: ['本機', '本機設定：只在你的瀏覽器或我們的後端生效，語音模型看不到。']
     };
     const kinds = { voice: 'api', openaiVoice: 'api', detection: 'api', endSensitivity: 'api', prefixMs: 'api',
-      pauseMs: 'api', interruption: 'api', thinking: 'api', openaiBrain: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', resumption: 'api', compression: 'api', startSeconds: 'api',
+      pauseMs: 'api', interruption: 'api', thinking: 'api', openaiBrain: 'api', openaiEffort: 'api', openaiMaxTokens: 'api', openaiWebSearch: 'api', openaiLab: 'api local', resumption: 'api', compression: 'api', startSeconds: 'api',
       automatic: 'api local', subtitles: 'api local', durationMinutes: 'api local',
       requireMaterial: 'local', materialLimit: 'local', echo: 'local', noiseSuppression: 'local',
       autoGainControl: 'local', reconnects: 'local', timeoutSeconds: 'local', requestsPerMinute: 'local', nudgeMinutes: 'local' };
@@ -55,6 +55,7 @@
       pacePercent: '滑桿只是寫進指令的數字，不是播放器倍速。',
       sentences: '滑桿只是寫進指令的數字，說到句數不會被切斷。',
       questions: '滑桿只是寫進指令的數字，不是硬性題數。',
+      openaiLab: '後端決定這通電話開哪些背景管道；前端面板只在打勾時出現。',
       nudgeMinutes: '瀏覽器自己計時，到點才把下面那句話送出去。Gemini 當成你說的話，GPT-Live 插一句應用指令。'
     };
     function badges(key) {
@@ -177,7 +178,7 @@
       activeVoice.closest('label').after(notes.element);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
-      ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
+      ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch', 'openaiLab'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       const teaching = switches.teaching.checked ? controls.teaching.value : 'off';
       const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
       Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
