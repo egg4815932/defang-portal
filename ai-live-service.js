@@ -6,14 +6,17 @@
   function finalizeRecording(id, bindNonce) {
     if (!recorder) return;
     const rec = recorder; recorder = null;
+    // 沒錄到音也照送逐字稿與時長；任何一步失敗都帶原因送回，不再安靜丟掉。
     rec.finish().then(result => {
-      if (!result.blob) return null;
-      return window.DFCallRecorderEncode(result.blob).then(base64 => Object.assign(result, { audio: base64 }));
+      if (!result.blob) return result;
+      return window.DFCallRecorderEncode(result.blob).then(base64 => Object.assign(result, { audio: base64 }),
+        error => Object.assign(result, { audioWhy: error.message }));
     }).then(result => {
-      if (!result) return;
       delete result.blob;
-      if (id === runId && nonce === bindNonce) send('callback', { runId: id, name: 'record', value: result });
-    }).catch(() => {});
+      if (nonce === bindNonce) send('callback', { runId: id, name: 'record', value: result });
+    }).catch(error => {
+      if (nonce === bindNonce) send('callback', { runId: id, name: 'record', value: { failed: '外殼打包失敗：' + (error && error.message || error) } });
+    });
   }
   function trusted(event) {
     const frame = document.querySelector('#appFrameViewport > iframe');
@@ -88,11 +91,13 @@
         callbacks[name] = value => {
           if (name === 'ended' && !begun) return;
           if (name === 'state') begun = true;
-          if (name === 'ready' && !m.testing && window.DFCallRecorder && id === runId && bindNonce === nonce) {
+          // 斷線續接會再收到 ready；已經在錄就沿用同一份，不能換新把前面的丟掉。
+          if (name === 'ready' && !recorder && !m.testing && window.DFCallRecorder && id === runId && bindNonce === nonce) {
             const run = client && client.run;
             recorder = new window.DFCallRecorder(model);
             // 錄 AI 實際經手的聲音：你的聲音取放大＋限幅之後，AI 的聲音取播放音量之前（不受滑桿與 iPhone 靜音 WebAudio 影響）。
-            if (!run || !run.context || !run.input || !run.output || !recorder.attach(run.context, run.boost ? run.boost.output : run.input, run.output)) recorder = null;
+            if (!run || !run.context || !run.input || !run.output) recorder.audioWhy = '找不到通話音訊節點';
+            else recorder.attach(run.context, run.boost ? run.boost.output : run.input, run.output);
           }
           if (name === 'text' && recorder) recorder.text(value);
           if (name === 'outputLevel' && recorder) recorder.outputLevel(value.level);

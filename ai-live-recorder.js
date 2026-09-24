@@ -15,7 +15,8 @@
     this.chunks = [];
     this.recorder = null;
     this.mime = '';
-    this.startedAt = 0;
+    this.startedAt = Date.now();
+    this.audioWhy = '';
     this.mutedAt = 0;
     this.mutedMs = 0;
     this.outputOn = false;
@@ -25,7 +26,7 @@
   CallRecorder.prototype.attach = function (context, inputNode, outputNode) {
     try {
       this.mime = pickMime();
-      if (!this.mime) return false;
+      if (!this.mime) { this.audioWhy = '此瀏覽器不支援錄音'; return false; }
       var dest = context.createMediaStreamDestination();
       var inputGain = context.createGain(); inputGain.gain.value = 1;
       var outputGain = context.createGain(); outputGain.gain.value = 1;
@@ -35,9 +36,8 @@
       var self = this;
       this.recorder.ondataavailable = function (event) { if (event.data && event.data.size) self.chunks.push(event.data); };
       this.recorder.start(1000);
-      this.startedAt = Date.now();
       return true;
-    } catch (error) { return false; }
+    } catch (error) { this.recorder = null; this.audioWhy = '錄音啟動失敗：' + (error && error.message || error); return false; }
   };
   CallRecorder.prototype.text = function (event) {
     var role = event.role === 'model' ? 'model' : 'user';
@@ -66,6 +66,7 @@
     var stop = new Promise(function (resolve) {
       if (!self.recorder || self.recorder.state === 'inactive') { resolve(); return; }
       self.recorder.onstop = function () { resolve(); };
+      setTimeout(resolve, 5000); // onstop 沒來也不能卡住整筆紀錄
       try { self.recorder.stop(); } catch (error) { resolve(); }
     });
     return stop.then(function () {
@@ -78,7 +79,8 @@
         outputSec: Math.round(self.outputMs / 1000),
         startedAt: self.startedAt ? new Date(self.startedAt).toISOString() : '',
         endedAt: new Date(now).toISOString(),
-        blob: blob, mime: self.mime
+        blob: blob, mime: self.mime,
+        audioWhy: blob ? '' : (self.audioWhy || '沒有錄到聲音資料')
       };
     });
   };

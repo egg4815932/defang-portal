@@ -287,7 +287,7 @@
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },
       error: text => status(view, text, true),
-      record: payload => { ticket(payload, 'ai-call-record').catch(() => status(view, '本次通話記錄／錄音儲存失敗，不影響下次通話', true)); },
+      record: payload => { ticket(payload, 'ai-call-record').catch(error => status(view, '本次通話記錄沒存到：' + (error && error.message || '未知原因'), true)); },
       activity: activity,
       inputLevel: event => view.feedback.level('input', event),
       inputPCM: event => view.capture.add(event),
