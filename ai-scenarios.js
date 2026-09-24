@@ -6,7 +6,7 @@
     const general = S.migrate(null, 'chat'); general.name = '日常對話';
     const study = S.defaults('教材陪練'); study.settings.requireMaterial = 'on';
     const builtins = [{ id: 'builtin-chat', scene: general }, { id: 'builtin-tutor', scene: study }];
-    let items = [], selectedId = builtins[0].id, editingId = '', revision = 0, dirty = false, loading = false, loaded = false, generation = 0;
+    let items = [], hidden = [], selectedId = builtins[0].id, editingId = '', revision = 0, dirty = false, loading = false, loaded = false, generation = 0;
     // selectedId 是對話頁套用中的情境；viewingId 是設定頁正在看的那一份，兩者可以不同。
     let viewingId = builtins[0].id;
     let busy = false;
@@ -15,7 +15,7 @@
     page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 語音設定</h1><p class="sub">情境設定庫 · 通話統一在 AI 語音對話</p></div><button type="button" data-use>前往對話</button></header>' +
       '<div class="scenario-layout"><aside class="scenario-library"><label>已儲存的情境<select data-library aria-label="已儲存的情境"></select></label>' +
       '<div class="scenario-actions"><button type="button" data-new>＋ 新情境</button><button type="button" data-copy>複製這份</button><button type="button" data-reload>重新載入</button></div>' +
-      '<details><summary>儲存說明／匯入舊設定</summary><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">原語音對話</button><button type="button" data-import="tutor">原教材陪練</button></details></aside>' +
+      '<details><summary>儲存說明／匯入舊設定</summary><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">原語音對話</button><button type="button" data-import="tutor">原教材陪練</button><button type="button" data-restore>恢復內建情境</button></details></aside>' +
       '<div class="scenario-editor"><div class="scenario-basics"><label>情境名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
       '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label></div>' +
       '<p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
@@ -124,8 +124,11 @@
         wrap.className = 'wide'; groups.get(f.group).append(notes.element);
       }
     });
-    function all() { return builtins.concat(items); }
-    function current() { return all().find(item => item.id === selectedId) || builtins[0]; }
+    // 內建情境可隱藏（帳號層級）；全部刪光時仍保底一份日常對話。
+    function all() { const list = builtins.filter(b => hidden.indexOf(b.id) < 0).concat(items); return list.length ? list : [builtins[0]]; }
+    function first() { return all()[0].id; }
+    function deletable() { return !!editingId || (/^builtin-/.test(viewingId) && all().length > 1); }
+    function current() { return all().find(item => item.id === selectedId) || all()[0]; }
     function message(text, error) { find('[data-message]').textContent = text; find('[data-message]').classList.toggle('error', !!error); }
     function read() {
       const settings = {};
@@ -189,7 +192,7 @@
       S.fields.forEach(f => { controls[f.key].value = scene.settings[f.key]; if (output[f.key]) output[f.key].value = scene.settings[f.key]; });
       Object.keys(switches).forEach(key => { switches[key].checked = (scene.off || []).indexOf(key) < 0; });
       editingId = id || ''; revision = rev || 0; dirty = false;
-      updateInstruction(); find('[data-delete]').disabled = !editingId || loading;
+      updateInstruction(); find('[data-delete]').disabled = !deletable() || loading;
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
     }
     function show(item) {
@@ -215,7 +218,7 @@
       page.querySelectorAll('input,select,textarea,button').forEach(el => { if (!el.matches('[data-close]')) el.disabled = value; });
       selector.disabled = value || busy;
       callModel.disabled = value || busy;
-      find('[data-delete]').disabled = value || !editingId; updateInstruction();
+      find('[data-delete]').disabled = value || !deletable(); updateInstruction();
       notes.lock(value);
     }
     async function load(force) {
@@ -224,8 +227,8 @@
       try {
         const result = await hooks.rpc({ action: 'list' });
         if (version !== generation) return;
-        items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) }));
-        if (!all().some(item => item.id === selectedId)) selectedId = builtins[0].id;
+        items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) })); hidden = result.hidden || [];
+        if (!all().some(item => item.id === selectedId)) selectedId = first();
         if (viewingId && !all().some(item => item.id === viewingId)) viewingId = selectedId;
         loaded = true; choices();
         if (!dirty || force) { const item = viewing(); if (item) show(item); }
@@ -239,7 +242,7 @@
       try {
         const result = await hooks.rpc({ action: 'save', id: editingId, revision, scene });
         if (version !== generation) return;
-        items = result.items; selectedId = result.selectedId; viewingId = selectedId;
+        items = result.items; hidden = result.hidden || []; selectedId = result.selectedId; viewingId = selectedId;
         choices(); show(current()); message('已儲存至你的帳號');
         if (use) hooks.use();
       } catch (error) { if (version === generation) message(error.message, true); }
@@ -261,12 +264,22 @@
       choices(); hooks.use();
     };
     find('[data-delete]').onclick = async () => {
-      if (!editingId || !window.confirm('確定刪除「' + name.value + '」？')) return;
+      if (!deletable() || !window.confirm('確定刪除「' + name.value + '」？')) return;
       const version = generation; lock(true);
       try {
-        const result = await hooks.rpc({ action: 'delete', id: editingId, revision });
+        const result = await hooks.rpc(editingId ? { action: 'delete', id: editingId, revision } : { action: 'hide', id: viewingId });
         if (version !== generation) return;
-        items = result.items; selectedId = builtins[0].id; viewingId = selectedId; choices(); show(current()); message('已刪除');
+        items = result.items; hidden = result.hidden || []; selectedId = first(); viewingId = selectedId; choices(); show(current()); message('已刪除');
+      } catch (error) { if (version === generation) message(error.message, true); }
+      finally { if (version === generation) lock(false); }
+    };
+    find('[data-restore]').onclick = async () => {
+      if (!discard()) return;
+      const version = generation; lock(true);
+      try {
+        const result = await hooks.rpc({ action: 'restore' });
+        if (version !== generation) return;
+        hidden = result.hidden || []; choices(); message('已恢復內建情境');
       } catch (error) { if (version === generation) message(error.message, true); }
       finally { if (version === generation) lock(false); }
     };
@@ -283,7 +296,7 @@
       get loading() { return loading; },
       edit: () => { notes.load(); if (!dirty) { const item = viewing(); if (item) show(item); } },
       lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading; },
-      reset: () => { generation++; notes.reset(); items = []; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
+      reset: () => { generation++; notes.reset(); items = []; hidden = []; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };
   };
