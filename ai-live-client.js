@@ -224,6 +224,7 @@
       if (message.setupComplete) {
         clearTimeout(run.timeout);
         run.ready = true;
+        if (!resumed && !run.testing && window.DFAIChime) window.DFAIChime(run.context);
         this.emit('ready', { resumed: resumed });
         this.emit('state', run.muted ? '麥克風已靜音' : '已連線，可以開始說話');
       }

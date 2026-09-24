@@ -106,6 +106,7 @@
           if (data.type === 'session.started' && !run.ready) {
             clearTimeout(run.timeout); run.ready = true; track.enabled = !run.muted;
             run.lastSound = Date.now(); run.context.resume().catch(() => {}); this.play(run);
+            if (window.DFAIChime) window.DFAIChime(run.context);
             this.emit('state', 'GPT-Live 已連線，可以開始說話'); this.emit('ready', { resumed: false });
           } else if (/^session\.(input|output)_transcript\.delta$/.test(data.type) && typeof data.delta === 'string') {
             const role = data.type.includes('input_') ? 'user' : 'model';
