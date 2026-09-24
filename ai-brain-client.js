@@ -37,13 +37,18 @@
     if (!job || this.busy) return;
     var turns = [];
     this.history.forEach(function (t) { if (t.text.trim()) turns.push({ role: t.role, text: t.text.trim() }); });
+    var opening = false;
     if (!turns.length || turns[turns.length - 1].role !== 'user') {
       // 字幕還沒把使用者那句收進來；等下一次 note 再觸發，逾時就放棄這輪。
       if (Date.now() < this.deadline) { this.schedule(); return; }
-      this.pending = null; return;
+      // 從頭到尾沒人開口過＝這是接通後的開場委派，改請後端用情境的開場白回答（只試一次）。
+      opening = !this.opened && !turns.some(function (t) { return t.role === 'user'; });
+      if (!opening) { this.pending = null; return; }
+      turns = [];
     }
+    this.opened = true;
     this.pending = null; this.busy = true;
-    this.ask({ action: 'brain', history: turns }).then(function (result) {
+    this.ask({ action: 'brain', history: turns, opening: opening }).then(function (result) {
       var text = result && typeof result.text === 'string' ? result.text.trim() : '';
       if (!text) throw new Error('大腦沒有回覆內容');
       // 第一次接上報一次型號：不然使用者無法分辨是大腦回的還是語音層自己講的。
@@ -66,7 +71,7 @@
   };
   BrainClient.prototype.reset = function () {
     clearTimeout(this.timer);
-    this.history = []; this.pending = null; this.busy = false; this.deadline = 0; this.announced = false;
+    this.history = []; this.pending = null; this.busy = false; this.deadline = 0; this.announced = false; this.opened = false;
   };
   root.DFBrainClient = BrainClient;
 })(typeof window !== 'undefined' ? window : globalThis);
