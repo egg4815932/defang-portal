@@ -27,7 +27,7 @@
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
       '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
-    const find = sel => page.querySelector(sel), controls = {}, output = {}, switches = {};
+    const find = sel => page.querySelector(sel), controls = {}, output = {}, switches = {}, marks = {};
     const name = find('[data-name]'), model = find('[data-model]'), material = find('[data-material]'), library = find('[data-library]');
     const selector = document.createElement('select'); selector.dataset.scenario = ''; selector.setAttribute('aria-label', '套用情境');
     const label = document.createElement('label'); label.className = 'scenario-picker'; label.append(document.createTextNode('情境'), selector);
@@ -97,7 +97,15 @@
         gate.title = '打勾才會送出這條指令；沒打勾會變灰色，不能編輯。';
         gate.append(box, document.createTextNode('送出'));
         gate.onclick = event => { if (event.target !== box && !box.disabled) box.click(); };
-        title.append(gate); switches[f.key] = box;
+        // 「刪除」勾勾只是標記：記在雲端共用一份，給之後整理欄位用，不影響送出內容。
+        const mark = document.createElement('input'); mark.type = 'checkbox'; mark.dataset.mark = f.key;
+        mark.setAttribute('aria-label', f.label + '：標記要刪除'); mark.style.accentColor = '#c0392b';
+        const markGate = document.createElement('span'); markGate.className = 'field-switch'; markGate.style.color = '#c0392b';
+        markGate.title = '標記這一項之後要刪掉；勾了會自動記住。';
+        markGate.append(mark, document.createTextNode('刪除'));
+        markGate.onclick = event => { if (event.target !== mark && !mark.disabled) mark.click(); };
+        mark.onchange = saveMarks;
+        title.append(gate, markGate); switches[f.key] = box; marks[f.key] = mark;
       }
       wrap.append(title);
       let input;
@@ -125,6 +133,13 @@
       }
     });
     // 內建情境可隱藏（帳號層級）；全部刪光時仍保底一份日常對話。
+    function applyMarks(list) { Object.keys(marks).forEach(key => { marks[key].checked = (list || []).indexOf(key) >= 0; }); }
+    let markSeq = 0;
+    async function saveMarks() {
+      const list = Object.keys(marks).filter(key => marks[key].checked), seq = ++markSeq;
+      try { const result = await hooks.rpc({ action: 'marks', marks: list }); if (seq === markSeq) { applyMarks(result.marks); message('已記住要刪除的項目：' + list.length + ' 項'); } }
+      catch (error) { if (seq === markSeq) message('刪除標記沒存到：' + error.message, true); }
+    }
     function all() { const list = builtins.filter(b => hidden.indexOf(b.id) < 0).concat(items); return list.length ? list : [builtins[0]]; }
     function first() { return all()[0].id; }
     function deletable() { return !!editingId || (/^builtin-/.test(viewingId) && all().length > 1); }
@@ -227,7 +242,7 @@
       try {
         const result = await hooks.rpc({ action: 'list' });
         if (version !== generation) return;
-        items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) })); hidden = result.hidden || [];
+        items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) })); hidden = result.hidden || []; applyMarks(result.marks);
         if (!all().some(item => item.id === selectedId)) selectedId = first();
         if (viewingId && !all().some(item => item.id === viewingId)) viewingId = selectedId;
         loaded = true; choices();
@@ -253,7 +268,7 @@
       if (!discard()) { library.value = viewingId || editingId || selectedId; return; }
       show(all().find(x => x.id === library.value));
     };
-    page.addEventListener('input', event => { if (event.target.matches('input,textarea')) changed(); });
+    page.addEventListener('input', event => { if (event.target.matches('input,textarea') && !event.target.matches('[data-mark]')) changed(); });
     page.addEventListener('change', event => { if (event.target !== library && event.target.matches('select')) changed(); });
     find('[data-new]').onclick = () => { if (discard()) { viewingId = ''; fill(S.defaults()); } };
     find('[data-copy]').onclick = () => { try { const scene = read(); scene.name = (scene.name + ' 副本').slice(0, 80); viewingId = ''; fill(scene); dirty = true; message('已複製成新草稿，請儲存'); } catch (error) { message(error.message, true); } };
