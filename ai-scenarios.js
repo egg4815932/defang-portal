@@ -13,17 +13,19 @@
     const page = document.createElement('section'); page.id = 'ai-tutor'; page.className = 'page scenario-page'; page.hidden = true;
     page.setAttribute('role', 'dialog'); page.setAttribute('aria-modal', 'true'); page.setAttribute('aria-label', 'AI 語音設定');
     page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 語音設定</h1><p class="sub">情境設定庫 · 通話統一在 AI 語音對話</p></div><button type="button" data-use>前往對話</button></header>' +
-      '<div class="scenario-layout"><aside class="scenario-library"><label>已儲存的情境<select data-library aria-label="已儲存的情境"></select></label>' +
-      '<div class="scenario-actions"><button type="button" data-new>＋ 新情境</button><button type="button" data-copy>複製這份</button><button type="button" data-reload>重新載入</button></div>' +
-      '<details><summary>儲存說明／匯入舊設定</summary><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">原語音對話</button><button type="button" data-import="tutor">原教材陪練</button><button type="button" data-restore>恢復內建情境</button></details></aside>' +
-      '<div class="scenario-editor"><div class="scenario-basics"><label>情境名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
-      '<label>模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label></div>' +
-      '<p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
+      // 情境庫、名稱、模型收成頂端一列工具列，下面全部設定分組卡片依螢幕寬度排成多欄。
+      '<div class="scenario-layout"><div class="scenario-toolbar"><label class="tb-library">情境<select data-library aria-label="已儲存的情境"></select></label>' +
+      '<label class="tb-name">名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
+      '<label class="tb-model">模型<select data-model><option value="gemini-3.8-live">Gemini 3.8 Live</option><option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Extended Thinking</option><option value="gpt-live-1">OpenAI GPT-Live-1</option></select></label>' +
+      '<div class="scenario-actions"><button type="button" data-new>＋ 新情境</button><button type="button" data-copy>複製</button><button type="button" data-reload>重新載入</button>' +
+      '<details class="scenario-more"><summary>更多</summary><div><p class="note">每個帳號最多 200 個情境。儲存後，設定與教材會跟著帳號，可在手機、電腦使用。</p><button type="button" data-import="chat">匯入原語音對話</button><button type="button" data-import="tutor">匯入原教材陪練</button><button type="button" data-restore>恢復內建情境</button></div></details>' +
+      '<label class="field-switch hint-toggle"><input type="checkbox" data-hints>顯示說明</label></div></div>' +
+      '<div class="scenario-editor"><p class="note" data-provider-note hidden>GPT-Live 自動處理接話與插話；Gemini 的手動分段、偵測、思考及續線選項不套用。語音每分鐘 US$0.05，後端推理另計；字幕關閉仍可正常通話。</p>' +
       '<div class="scenario-legend">每格的標記：' +
       '<span><span class="field-badge badge-api">API</span>系統開關，一定照做</span>' +
       '<span><span class="field-badge badge-prompt">指令</span>寫進說明書，模型盡量照做</span>' +
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
-      '<div data-groups></div><details class="scenario-group"><summary>教材內容</summary><label><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea></label><p class="note" data-count></p></details>' +
+      '<div class="scenario-cols" data-groups></div><label class="material-field" data-material-field><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea><small class="count-line" data-count></small></label>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
       '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
@@ -79,16 +81,21 @@
         });
       });
     }
+    // 音色名字與備註平常收起來，要寫時再展開。
+    const notesBox = document.createElement('details'); notesBox.className = 'voice-notes-box';
+    const notesSummary = document.createElement('summary'); notesSummary.textContent = '音色名字與備註';
+    notesBox.append(notesSummary, notes.element);
     S.fields.forEach(f => {
       if (!groups.has(f.group)) {
         const details = document.createElement('details'); details.className = 'scenario-group';
         const summary = document.createElement('summary'); summary.textContent = f.group;
         const grid = document.createElement('div'); grid.className = 'scenario-grid'; details.append(summary, grid);
-        if (!groups.size) details.open = true;
+        details.open = true;
         find('[data-groups]').append(details); groups.set(f.group, grid);
       }
-      const wrap = document.createElement('label');
+      const wrap = document.createElement('label'); wrap.className = f.type === 'text' ? 'text' : f.type === 'range' ? 'range' : 'pick';
       const title = document.createElement('span'); title.className = 'field-title'; title.textContent = f.label;
+      if (f.hint) title.title = f.hint;
       title.append(...badges(f.key));
       // 標「指令」的每一格都給勾勾；沒打勾就整條關掉：欄位變灰、不能改，也不送出。
       if (!kinds[f.key]) {
@@ -121,18 +128,38 @@
         output[f.key] = number; wrap.append(line);
         input.addEventListener('input', () => { number.value = input.value; });
       } else {
-        input = document.createElement('textarea'); input.rows = f.max <= 60 ? 1 : 3; input.maxLength = f.max;
-        if (f.max > 60) wrap.className = 'wide';
+        input = document.createElement('textarea'); input.rows = f.max <= 60 ? 1 : 2; input.maxLength = f.max;
       }
       input.dataset.setting = f.key; input.setAttribute('aria-label', f.label);
       if (switches[f.key]) { input.id = 'scenario-field-' + f.key; wrap.htmlFor = input.id; }
       wrap.append(input);
       if (f.hint) { const hint = document.createElement('small'); hint.textContent = f.hint; wrap.append(hint); }
       controls[f.key] = input; groups.get(f.group).append(wrap);
-      if (f.key === 'voice' || f.key === 'openaiVoice') {
-        wrap.className = 'wide'; groups.get(f.group).append(notes.element);
-      }
+      if (f.key === 'voice' || f.key === 'openaiVoice') groups.get(f.group).append(notesBox);
     });
+    groups.get('教材').append(find('[data-material-field]'));
+    // 分組卡片排成等寬多欄，每張卡放進目前最矮的那一欄（瀑布流），寬螢幕不會留空欄。
+    // 只在欄數、模型或說明開關改變時重排，打字中不搬動卡片、不會掉焦點。
+    const board = find('[data-groups]'), cards = Array.from(board.children);
+    let packed = '';
+    function pack() {
+      const width = board.clientWidth; if (!width) return;
+      const n = Math.max(1, Math.floor((width + 10) / 330));
+      const key = n + '|' + model.value + '|' + page.classList.contains('show-hints');
+      if (key === packed) return; packed = key;
+      const columns = Array.from({ length: n }, () => { const c = document.createElement('div'); c.className = 'scenario-col'; return c; });
+      board.replaceChildren(...columns);
+      cards.forEach(card => columns.reduce((a, b) => b.offsetHeight < a.offsetHeight ? b : a).append(card));
+    }
+    if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(pack)).observe(board);
+    // 說明文字平常收起來（滑過欄位名稱看得到），需要時一鍵全部展開；只記在這台瀏覽器。
+    const hintBox = find('[data-hints]');
+    try { hintBox.checked = localStorage.getItem('defang.ai.scenario.hints') === 'on'; } catch (error) {}
+    page.classList.toggle('show-hints', hintBox.checked);
+    hintBox.onchange = () => {
+      page.classList.toggle('show-hints', hintBox.checked); pack();
+      try { localStorage.setItem('defang.ai.scenario.hints', hintBox.checked ? 'on' : 'off'); } catch (error) {}
+    };
     // 內建情境可隱藏（帳號層級）；全部刪光時仍保底一份日常對話。
     function applyMarks(list) { Object.keys(marks).forEach(key => { marks[key].checked = (list || []).indexOf(key) >= 0; }); }
     let markSeq = 0;
@@ -175,14 +202,10 @@
       controls.voice.closest('label').hidden = openai;
       controls.openaiVoice.closest('label').hidden = !openai;
       const activeVoice = openai ? controls.openaiVoice : controls.voice;
-      activeVoice.closest('label').after(notes.element);
+      activeVoice.closest('label').after(notesBox);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
       ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch', 'openaiLab'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
-      const teaching = switches.teaching.checked ? controls.teaching.value : 'off';
-      const teachingFields = { ask: 'teachingAskRule', explain: 'teachingExplainRule', quiz: 'teachingQuizRule', hint: 'teachingHintRule' };
-      Object.keys(teachingFields).forEach(mode => { controls[teachingFields[mode]].closest('label').hidden = teaching !== mode; });
-      ['questions', 'questionRule', 'teachingRule'].forEach(k => { controls[k].closest('label').hidden = teaching === 'off'; });
       Object.keys(switches).forEach(key => {
         const on = switches[key].checked;
         controls[key].disabled = loading || !on;
@@ -201,6 +224,7 @@
         controls[k].disabled = loading || controls.automatic.value === 'off';
         if (output[k]) output[k].disabled = controls[k].disabled;
       });
+      pack();
     }
     function changed() { dirty = true; message('尚未儲存 · 對話仍使用上次儲存的設定'); updateInstruction(); hooks.activity(); }
     function fill(scene, id, rev) {
@@ -269,7 +293,7 @@
       if (!discard()) { library.value = viewingId || editingId || selectedId; return; }
       show(all().find(x => x.id === library.value));
     };
-    page.addEventListener('input', event => { if (event.target.matches('input,textarea') && !event.target.matches('[data-mark]')) changed(); });
+    page.addEventListener('input', event => { if (event.target.matches('input,textarea') && !event.target.matches('[data-mark],[data-hints]')) changed(); });
     page.addEventListener('change', event => { if (event.target !== library && event.target.matches('select')) changed(); });
     find('[data-new]').onclick = () => { if (discard()) { viewingId = ''; fill(S.defaults()); } };
     find('[data-copy]').onclick = () => { try { const scene = read(); scene.name = (scene.name + ' 副本').slice(0, 80); viewingId = ''; fill(scene); dirty = true; message('已複製成新草稿，請儲存'); } catch (error) { message(error.message, true); } };

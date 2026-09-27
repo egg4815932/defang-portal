@@ -1,42 +1,79 @@
-.scenario-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;flex:1;min-height:0}
-.scenario-library,.scenario-editor{overflow:auto;overscroll-behavior:contain;min-height:0}
-.scenario-library{display:flex;flex-direction:column;gap:16px;padding:18px;background:#e8f3ec;border-radius:20px}
-.scenario-library label,.scenario-basics label{display:grid;gap:8px;font-size:14px}
-.scenario-library select{width:100%;min-width:0}.scenario-actions{display:grid;gap:8px}
-.scenario-basics{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 4px 16px}
+/* 設定頁：頂端一列工具列＋分組卡片多欄排列，一眼看到最多設定。 */
+.scenario-page{gap:8px}
+.scenario-layout{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+.scenario-editor{flex:1;overflow:auto;overscroll-behavior:contain;min-height:0;padding:0 2px 4px}
+.scenario-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 12px;background:#e8f3ec;border-radius:14px;flex-shrink:0}
+.scenario-toolbar>label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;min-width:0}
+.scenario-toolbar .tb-library{flex:1 1 220px}.scenario-toolbar .tb-name{flex:1 1 200px}.scenario-toolbar .tb-model{flex:0 1 250px}
+.scenario-toolbar>label>select,.scenario-toolbar>label>input{flex:1}
+.scenario-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.scenario-more{position:relative}
+.scenario-more>summary{list-style:none;cursor:pointer;font-size:13px;padding:5px 10px;border:1px solid #bcdcc5;border-radius:10px;background:#fff}
+.scenario-more>summary::-webkit-details-marker{display:none}
+.scenario-more>div{position:absolute;z-index:5;top:calc(100% + 4px);right:0;width:260px;display:grid;gap:6px;padding:10px;background:#fff;border:1px solid #bcdcc5;border-radius:12px;box-shadow:0 8px 24px #2c6a4026}
+.scenario-more .note{font-size:12px;margin:0}
 .scenario-page input,.scenario-page select{min-width:0;width:100%}
-.scenario-page input:not([type=range]){min-height:44px;border:1px solid #bcdcc5;border-radius:12px;padding:8px 12px;background:white}
-.scenario-group{border:1px solid #d0e6d6;border-radius:16px;background:#ffffffb8;margin:0 0 12px;padding:0 16px 12px}
-.scenario-group summary{cursor:pointer;min-height:48px;padding:12px 0;font-weight:600}
+.scenario-page input:not([type=range]):not([type=checkbox]){border:1px solid #bcdcc5;border-radius:10px;padding:4px 10px;background:white}
+.scenario-page select,.scenario-page input:not([type=range]):not([type=checkbox]){min-height:34px;padding-top:4px;padding-bottom:4px;font-size:14px;border-radius:10px}
+.scenario-page button{min-height:34px;padding:5px 12px;font-size:13px;border-radius:10px}
+/* 分組卡片：依寬度自動排 1～5 欄，每張卡不拆到兩欄。 */
+
+.scenario-group{break-inside:avoid;display:inline-block;width:100%;box-sizing:border-box;border:1px solid #d0e6d6;border-radius:12px;background:#ffffffc8;margin:0 0 10px;padding:0 10px 8px}
+.scenario-group summary{cursor:pointer;padding:6px 0;font-weight:700;font-size:14px;color:#2b7e43}
 .scenario-group:not([open]){padding-bottom:0}
-.scenario-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.scenario-grid label{display:flex;flex-direction:column;gap:6px;font-size:14px;min-width:0}
-.scenario-grid .wide{grid-column:1/-1}.scenario-grid small{font-size:12px;color:#5c8065}
-.voice-notes{padding:12px;background:#e8f3ec;border-radius:12px;min-width:0}.voice-notes textarea{width:100%;box-sizing:border-box}.voice-notes input[data-voice-alias]{width:100%;box-sizing:border-box;min-height:44px;font-size:15px;padding:8px 10px}.voice-note-actions{display:flex;gap:8px;flex-wrap:wrap}.voice-note-actions button{min-height:44px;font-size:13px}.voice-notes [data-note-status]{overflow-wrap:anywhere}
-.scenario-page textarea{flex:none;min-height:48px;resize:vertical;font-size:14px;padding:10px;line-height:1.65}
-.scenario-page textarea[data-material]{min-height:240px}
-.scenario-page input[type=range]{accent-color:#2b7e43;min-height:32px;cursor:pointer}
-.range-value{display:flex;align-items:center;gap:8px}.range-value input{max-width:110px}
+.scenario-grid{display:grid;gap:8px}
+.scenario-grid label{display:flex;flex-direction:column;gap:3px;font-size:13px;min-width:0}
+/* 選單：名稱與選單同一行；滑桿：滑桿與數字同一行。 */
+.scenario-grid label.pick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);align-items:center;column-gap:8px}
+.scenario-grid label.range{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px}
+.scenario-grid label.pick>small,.scenario-grid label.range>.field-title,.scenario-grid label.range>small{grid-column:1/-1}
+.scenario-grid label.range>input[type=range]{grid-row:2;grid-column:1}
+.scenario-grid label.range>.range-value{grid-row:2;grid-column:2}
+.scenario-grid small{font-size:12px;color:#5c8065}
+.scenario-page:not(.show-hints) .scenario-grid small,.scenario-page:not(.show-hints) .scenario-legend,.scenario-page:not(.show-hints) .voice-notes>.note:not([data-note-status]){display:none}
+.voice-notes{display:grid;gap:4px;padding:8px;background:#e8f3ec;border-radius:10px;min-width:0;font-size:13px}.voice-notes .note{margin:0;font-size:12px}.voice-notes label{gap:2px}.voice-notes textarea{width:100%;box-sizing:border-box}.voice-notes input[data-voice-alias]{width:100%;box-sizing:border-box}.voice-note-actions{display:flex;gap:6px;flex-wrap:wrap}.voice-note-actions button{font-size:12px}.voice-notes [data-note-status]{overflow-wrap:anywhere}.voice-notes [data-note-status]:empty{display:none}
+.scenario-page textarea{flex:none;min-height:34px;max-height:200px;resize:vertical;font-size:13px;padding:6px 9px;line-height:1.55;border-radius:10px;field-sizing:content}
+.scenario-page .material-field textarea{min-height:120px;max-height:360px}
+.count-line{text-align:right}
+.scenario-page input[type=range]{accent-color:#2b7e43;min-height:26px;cursor:pointer}
+.range-value{display:flex;align-items:center;gap:4px;font-size:12px}.range-value input{width:86px;max-width:86px}
+.scenario-editor>.scenario-group{display:block}
 .scenario-page pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.8 "LINE Seed TW",system-ui,sans-serif;max-height:400px;overflow:auto;user-select:text}
 .scenario-page pre .instruction-fixed{background:#cbe7d5;border-radius:4px;box-shadow:0 0 0 2px #cbe7d5}
 .scenario-page .instruction-off:not(:empty){color:#9a5b00}
-.scenario-footer{padding-top:4px}.scenario-footer [data-message]{flex:1;font-size:13px}.scenario-footer .error{color:#a43a32}
+.scenario-page [data-provider-note]{margin:0 2px 8px;font-size:12px}
+.scenario-footer{padding-top:2px;gap:8px}.scenario-footer [data-message]{flex:1;font-size:13px;margin:0}.scenario-footer .error{color:#a43a32}
 .scenario-picker{display:flex;align-items:center;gap:12px;width:100%;max-width:1200px;margin:0 auto;font-size:14px}
 .scenario-picker select{flex:1;min-width:0;max-width:600px}.scenario-info{max-width:1200px;width:100%;margin:0 auto;font-size:12px}
 .manual-turn{font-size:13px;max-width:150px}.manual-turn[aria-pressed=true]{background:#d5f0da;border-color:#2b7e43}
-@media(max-width:750px){.scenario-layout{display:flex;flex-direction:column;gap:10px}.scenario-library{flex:none;padding:12px;gap:8px;overflow:visible}.scenario-library>.note,.scenario-library>details{font-size:12px}.scenario-actions{display:flex;flex-wrap:wrap}.scenario-actions button{flex:1;padding:6px;font-size:13px}.scenario-editor{flex:1}.scenario-basics,.scenario-grid{grid-template-columns:1fr}.scenario-page>header{flex-wrap:wrap}.scenario-page h1{font-size:20px}.scenario-page>header>button{font-size:12px;padding:8px}.scenario-footer{flex-wrap:wrap;gap:8px}.scenario-footer [data-message]{flex-basis:100%}.scenario-footer button{flex:1;font-size:13px;padding:8px}.scenario-group{padding-left:12px;padding-right:12px}.scenario-page .sub{font-size:12px}}
+/* 手指操作：按鈕與輸入框保留 44px 觸控高度。 */
+@media(pointer:coarse){.scenario-page select,.scenario-page input:not([type=range]):not([type=checkbox]),.scenario-page button{min-height:44px}.scenario-page input[type=range]{min-height:36px}}
+@media(max-width:750px){.scenario-toolbar{padding:8px}.scenario-actions{flex:1 1 100%}.scenario-actions>button{flex:1}.scenario-page>header{flex-wrap:wrap}.scenario-page h1{font-size:20px}.scenario-page>header>button{font-size:12px;padding:8px}.scenario-footer{flex-wrap:wrap}.scenario-footer [data-message]{flex-basis:100%}.scenario-footer button{flex:1}.scenario-page .sub{font-size:12px}}
 
 .scenario-call-pickers{display:grid;gap:8px;width:100%;max-width:1200px;margin:0 auto}.scenario-grid label[hidden],.voice-notes[hidden]{display:none}
-.field-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.field-badge{font-size:11px;line-height:1;padding:3px 6px;border-radius:6px;font-weight:700;letter-spacing:.3px;cursor:help;white-space:nowrap}
+.field-title{display:flex;align-items:center;gap:4px 5px;flex-wrap:wrap;font-weight:600}
+.field-badge{font-size:10px;line-height:1;padding:2px 5px;border-radius:5px;font-weight:700;letter-spacing:.3px;cursor:help;white-space:nowrap}
 .badge-api{background:#2b7e43;color:#fff}
 .badge-prompt{background:#f3e0bd;color:#82520b}
 .badge-local{background:#dde6e0;color:#48674f}
-.scenario-legend{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 4px 14px;font-size:12px;color:#5c8065}
+.scenario-legend{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 4px 8px;font-size:12px;color:#5c8065}
 .scenario-legend>span{display:inline-flex;align-items:center;gap:5px}
 /* 每條指令右邊的勾勾：沒勾就變灰、不能改，也不會送出。 */
-.field-switch{display:inline-flex;align-items:center;gap:5px;padding:4px 2px;font-size:12px;font-weight:700;color:#2b7e43;cursor:pointer;white-space:nowrap}
-.field-switch input[type=checkbox]{width:22px;height:22px;min-width:22px;min-height:22px;margin:0;padding:0;border-radius:6px;accent-color:#2b7e43;cursor:pointer}
+.field-switch{display:inline-flex;align-items:center;gap:4px;padding:0 2px;font-size:12px;font-weight:700;color:#2b7e43;cursor:pointer;white-space:nowrap}
+.field-title>.field-badge+.field-switch{margin-left:auto}
+.field-switch input[type=checkbox]{width:16px;height:16px;min-width:16px;min-height:16px;margin:0;padding:0;border-radius:4px;accent-color:#2b7e43;cursor:pointer}
+@media(pointer:coarse){.field-switch input[type=checkbox]{width:22px;height:22px;min-width:22px;min-height:22px}}
 .scenario-grid label.field-off>.field-title,.scenario-grid label.field-off .field-switch{color:#9aa79d}
 .scenario-page textarea:disabled,.scenario-page select:disabled,.scenario-page input:not([type=range]):disabled{background:#eef1ef;color:#93a198;cursor:not-allowed}
 .scenario-page input[type=range]:disabled{accent-color:#b6c4ba;cursor:not-allowed}
+/* 瀑布流欄：JS 依寬度切欄，卡片放進最矮那欄。 */
+.scenario-cols{display:flex;gap:10px;align-items:flex-start}
+.scenario-col{flex:1;min-width:0}
+.scenario-cols .scenario-group{display:block}
+.voice-notes-box>summary{cursor:pointer;font-size:12px;color:#2b7e43;font-weight:600;padding:2px 0}
+.voice-notes-box[open]>summary{margin-bottom:4px}
+/* 設定頁要最大空間：不套對話頁寬螢幕的 5vw 左右留白。 */
+@media(min-width:1100px){.scenario-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+.scenario-page:not(.show-hints) [data-provider-note]{display:none}
+.scenario-actions>button,.scenario-more>summary{white-space:nowrap}
+@media(max-width:750px){.scenario-toolbar{gap:6px}.scenario-toolbar .tb-library{flex:1 1 100%}.scenario-toolbar .tb-name,.scenario-toolbar .tb-model{flex:1 1 150px}.scenario-actions>button{padding:4px 6px}}
