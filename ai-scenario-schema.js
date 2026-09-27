@@ -12,6 +12,8 @@ var DFAISchema = (function () {
     fields.push({ key: key, label: label, group: group, type: 'text', value: value, max: max || 2000, hint: hint || '文字指令：引導 AI，不是硬性開關。取消右邊的勾選就不送這段。' });
   }
   var onoff = [['on', '開啟'], ['off', '關閉']];
+  // 開場白是 AI 要說的台詞。舊預設是使用者口吻，AI 照說會變成「我已準備好」，載入時換成新預設。
+  var OPENING = '嗨，我準備好了，我們開始吧！', OLD_OPENING = '我已準備好，請依照設定的教學方式開始。';
   // Google 官方 Gemini TTS 性別分類與 Live API 音色特色，核對於 2026-09-20。
   var voices = [
     ['Kore','女聲','堅定'], ['Zephyr','女聲','明亮'], ['Puck','男聲','活潑'],
@@ -52,8 +54,8 @@ var DFAISchema = (function () {
   range('questions', '每輪目標題數', '教學', 0, 5, 1, 1, '題', '0 表示停用題數規則，不是禁止出題；其他數字套用到下方的 {題數}。');
   text('questionRule', '題數與回饋規則', '教學', '出題時每輪目標 {題數} 題，等待回答再回饋。', 2000, '可自由改寫出題及回饋方式；{題數} 會換成上方數字。留白或題數設為 0，就不加入這段指令。');
   text('teachingRule', '教學補充規則', '教學', '講解分小段，等學員回答後再給回饋。使用者明確要求切換教學方式時，依當次要求調整。');
-  choice('autoGreeting', '連上後自動開場', '通話流程', onoff, 'on');
-  text('opening', '替你送出的第一句話', '通話流程', '我已準備好，請依照設定的教學方式開始。', 2000, '開啟自動開場時，新通話送一次；接回原對話不重送。');
+  choice('autoGreeting', '接通後 AI 先開口', '通話流程', onoff, 'on');
+  text('opening', 'AI 開場白', '通話流程', OPENING, 2000, '接通後 AI 先說這句，會照「說話風格」裡的角色與語氣說出來，不是照稿念；接回原對話不重說。');
   choice('requireMaterial', '開始前必須有教材', '教材', onoff, 'off');
   range('materialLimit', '這個情境的教材字數上限', '教材', 500, 12000, 500, 12000, '字', '系統最高 12,000 字。');
   choice('automatic', '說話分段方式', '收音與接話', [['on', 'AI 自動判斷'], ['off', '手動按「開始說話／送出」']], 'on', '手動模式只在按下開始說話後送聲音，送出時結束這一段。');
@@ -103,6 +105,7 @@ var DFAISchema = (function () {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('情境設定格式不正確');
     // 舊情境存的 5.6 Luna／Terra 自動升級成 6 Luna／6 Sol。
     if (input.openaiBrain === 'gpt-5.6-luna') input = Object.assign({}, input, { openaiBrain: 'gpt-6-luna' });
+    if (input.opening === OLD_OPENING) input = Object.assign({}, input, { opening: OPENING });
     if (input.openaiBrain === 'gpt-5.6-terra') input = Object.assign({}, input, { openaiBrain: 'gpt-6-sol' });
     fields.forEach(function (f) {
       var v = input[f.key] === undefined ? f.value : input[f.key];
@@ -170,21 +173,30 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
+  // AI 開場白的導演稿：GPT-Live 的插話、Gemini 的第一句、Gemini 大腦的開場請求都用這一份。
+  // 只丟台詞，模型會像念稿一樣平平地唸；要附上角色與語氣，請它演出來。
+  function greeting(scene) {
+    var s = scene.settings, off = scene.off || [];
+    if (s.autoGreeting !== 'on' || off.indexOf('autoGreeting') >= 0 || off.indexOf('opening') >= 0 || !s.opening) return '';
+    var style = [off.indexOf('roleRule') < 0 && s.roleRule ? '角色：' + s.roleRule : '', off.indexOf('toneRule') < 0 && s.toneRule ? '語氣：' + s.toneRule : ''].filter(Boolean).join('；');
+    return '通話一接通就由你先開口，說出這句開場白：「' + s.opening + '」。' + (style ? '照你設定的' + style + '。' : '') +
+      '把它當成你自己的台詞、帶著這個語氣演出來，不要像在念稿或轉述。說完就停下來，等使用者回話。';
+  }
   // 真正送到語音模型的那一份：後端固定補的段落也列在這裡，設定頁預覽與 GAS 共用同一個來源。
   function delivery(scene) {
     var s = scene.settings, off = scene.off || [], openai = scene.model === 'gpt-live-1';
     // 自動開場與開場白各自有勾勾，少一個就沒有開場白可送。
-    var greeting = s.autoGreeting === 'on' && off.indexOf('autoGreeting') < 0 && off.indexOf('opening') < 0 ? s.opening : '';
+    var cue = greeting(scene);
     var parts = [{ text: instruction(scene), fixed: false }];
     if (openai) {
-      parts.push({ text: greeting ? '連線後請主動回應這個開場要求：' + greeting : '連線後先等待使用者說話，不主動開場。', fixed: true });
+      parts.push({ text: cue || '連線後先等待使用者說話，不主動開場。', fixed: true });
     }
     return {
       parts: parts,
       text: parts.map(function (p) { return p.text; }).join('\n'),
-      // system：開場白併在指令內；turn：新通話時另外當成使用者的一句話送出；none：不自動開場。
-      opening: !greeting ? 'none' : (openai ? 'system' : 'turn')
+      // system：GPT-Live 接通後插一句應用指令；turn：Gemini 新通話時當成一句話送出；none：不自動開場。
+      opening: !cue ? 'none' : (openai ? 'system' : 'turn'), cue: cue
     };
   }
-  return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, defaults: defaults, migrate: migrate };
+  return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, greeting: greeting, defaults: defaults, migrate: migrate };
 })();

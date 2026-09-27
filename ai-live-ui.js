@@ -304,11 +304,10 @@
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini', model: scene.model });
-      // turn＝Gemini 把開場白當成使用者的一句話送出；沒打勾的情況 delivery 會回 none。
-      // system＝GPT-Live：官方說開場寫在建立時的指令裡不會讓它先開口，要接通後再插一句應用指令。
-      const opening = window.DFAISchema.delivery(scene).opening;
-      view.sessionGreeting = opening === 'turn' ? scene.settings.opening
-        : opening === 'system' ? '現在請立刻先開口，照這個開場要求說：' + scene.settings.opening + '。說完就停下來，等使用者回話。' : '';
+      // 兩種模型送的都是同一份「AI 開場白」導演稿（附角色與語氣），沒打勾時 delivery 回 none。
+      // turn＝Gemini 當成一句話送進去；system＝GPT-Live：官方說開場寫在建立指令裡不會讓它先開口，要接通後再插一句應用指令。
+      const delivered = window.DFAISchema.delivery(scene), opening = delivered.opening;
+      view.sessionGreeting = delivered.cue;
       // 到點提醒：Gemini 當成你說的一句話，GPT-Live 插一句應用指令。
       // nudgeReady 要跟後端開的白名單一致，client 端才知道這條事件能不能送。
       const nudgeText = (scene.off || []).indexOf('nudgeText') < 0 ? scene.settings.nudgeText : '';
