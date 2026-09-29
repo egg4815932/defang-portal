@@ -16,7 +16,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260922-3', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260927-1', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260930-1', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
@@ -171,9 +171,9 @@
     page.hidden = true;
     page.setAttribute('role', 'dialog');
     page.setAttribute('aria-modal', 'true');
-    page.setAttribute('aria-label', tutor ? 'AI 語音設定' : 'AI 語音對話');
+    page.setAttribute('aria-label', tutor ? 'AI 語音設定' : 'AI情境模擬');
     page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>' +
-      (tutor ? 'AI 語音設定' : 'AI 語音對話') + '</h1><p class="sub">' +
+      (tutor ? 'AI 語音設定' : 'AI情境模擬') + '</h1><p class="sub">' +
       (tutor ? '貼上教材，一起弄懂，再練習說出答案。' : '像打電話一樣，直接說出你想問的事。') +
       '</p></div></header><div class="model-row"><label for="model-' + mode + '">Gemini 3.8</label>' +
       '<select id="model-' + mode + '"><option value="gemini-3.8-live">一般版（Live）</option>' +
@@ -286,7 +286,7 @@
         if (!info.resumed && view.sessionGreeting) view.client.prompt(view.sessionGreeting);
       },
       ended: () => { view.capture.finish(); controls(view, false, false); },
-      error: text => status(view, text, true),
+      error: text => { if (!view.client.run) end(view); status(view, text, true); },
       record: payload => { ticket(payload, 'ai-call-record').catch(error => status(view, '本次通話記錄沒存到：' + (error && error.message || '未知原因'), true)); },
       activity: activity,
       inputLevel: event => view.feedback.level('input', event),
@@ -300,7 +300,8 @@
     view.start.addEventListener('click', async () => {
       if (view.busy || current !== view) return;
       if (scenarios.loading) { status(view, '情境載入中，請稍候'); return; }
-      const scene = scenarios.current();
+      if (!scenarios.canStart) { status(view, '沒有可用情境或額度已用完，請更新剩餘次數或聯絡管理者', true); return; }
+      const scene = scenarios.current(), selected = scenarios.selected();
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini', model: scene.model });
@@ -321,14 +322,21 @@
       view.callStartedAt = 0; view.nudgeSentAt = 0;
       if (view.sessionSettings.provider === 'openai') view.sessionSettings.automatic = 'on';
       view.model.value = scene.model;
-      const options = { scenario: scene };
+      const options = { scenario: scene, sceneId: selected && !selected.id.startsWith('builtin-') ? selected.id : '' };
       view.version++;
       const version = view.version;
       view.testing = false;
       empty();
       controls(view, true, false);
       activity();
-      await view.client.start(extra => scene.model === 'gpt-live-1' ? ticket(Object.assign({ scenario: scene }, extra), 'ai-openai-session') : ticket(options), view.feedback.select.value, view.sessionSettings);
+      await view.client.start(async extra => {
+        const result = await (scene.model === 'gpt-live-1' ? ticket(Object.assign({}, options, extra), 'ai-openai-session') : ticket(options));
+        if (view.version === version) {
+          scenarios.consumed(result);
+          if (result.expiresAt) { view.callStartedAt = Date.now(); view.callLimitMs = Math.max(0, result.expiresAt - Date.now()); }
+        }
+        return result;
+      }, view.feedback.select.value, view.sessionSettings);
       if (view.version === version && !view.client.run) controls(view, false, false);
     });
     view.stop.addEventListener('click', () => { end(view, '通話已結束；再次開始會建立新對話'); cancelPending(); });
@@ -367,14 +375,14 @@
     view.manual.hidden = true; view.manual.textContent = '開始說話';
     view.manual.onclick = () => { if (view.client.manualTurn()) controls(view, true, true); activity(); };
     page.querySelector('.controls').prepend(view.manual);
-    page.querySelector('header').after(scenarios.picker, scenarios.info);
+    page.querySelector('header').after(scenarios.picker, scenarios.info, scenarios.quota);
     view.compact = window.DFAIHeart(view, view.compact);
     if (window.DFAILab) view.lab = window.DFAILab(view);
     empty(); status(view, view.status.textContent);
     controls(view, false, false);
     return view;
   }
-  const scenarios = new window.DFAIScenarios({ rpc: options => ticket(options, 'ai-live-scenarios'), notesRpc: options => ticket(options, 'ai-live-voice-notes'), activity: activity,
+  const scenarios = new window.DFAIScenarios({ rpc: options => ticket(options, 'ai-live-scenarios'), notesRpc: options => ticket(options, 'ai-live-voice-notes'), accessRpc: options => ticket(options, 'ai-scenario-access'), activity: activity,
     use: () => switchView('chat'), change: scene => {
       if (views.chat) {
         views.chat.model.value = scene.model;
@@ -396,7 +404,7 @@
     if (embedded) embedded.select(mode);
     if (mode === 'tutor') scenarios.edit();
     else current.feedback.devices();
-    scenarios.load();
+    scenarios.load(mode === 'chat' ? 'refresh' : false);
     if (!embedded) current.page.querySelector('[data-close]').focus();
     activity();
   }

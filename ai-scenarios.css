@@ -1,5 +1,12 @@
 /* 設定頁：頂端一列工具列＋分組卡片多欄排列，一眼看到最多設定。 */
 .scenario-page{gap:8px}
+.scenario-access .access-add,.access-actions{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.scenario-access .access-add select{flex:1;min-width:150px}
+.access-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #d0e6d6}
+.access-row>span{flex:1;min-width:120px}.access-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}.access-row input{max-width:86px}
+.scenario-access button,.scenario-access select,.scenario-access input{min-height:44px}
+.scenario-quota{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;font-size:14px;color:#2b7e43;padding:8px 12px;background:#e8f3ec;border-radius:12px}
+.scenario-quota[hidden]{display:none}.scenario-quota button{min-height:44px;font-size:13px;padding:6px 12px}
 .scenario-layout{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
 .scenario-editor{flex:1;overflow:auto;overscroll-behavior:contain;min-height:0;padding:0 2px 4px}
 .scenario-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 12px;background:#e8f3ec;border-radius:14px;flex-shrink:0}

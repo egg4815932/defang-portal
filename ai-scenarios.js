@@ -1,4 +1,4 @@
-/* 情境編輯與選用；只有 AI 語音對話頁持有麥克風與 LiveClient。 */
+/* 情境編輯與選用；只有 AI情境模擬頁持有麥克風與 LiveClient。 */
 (function () {
   'use strict';
   window.DFAIScenarios = function (hooks) {
@@ -9,10 +9,10 @@
     let items = [], hidden = [], selectedId = builtins[0].id, editingId = '', revision = 0, dirty = false, loading = false, loaded = false, generation = 0;
     // selectedId 是對話頁套用中的情境；viewingId 是設定頁正在看的那一份，兩者可以不同。
     let viewingId = builtins[0].id;
-    let busy = false;
+    let busy = false, allowBuiltins = true;
     const page = document.createElement('section'); page.id = 'ai-tutor'; page.className = 'page scenario-page'; page.hidden = true;
     page.setAttribute('role', 'dialog'); page.setAttribute('aria-modal', 'true'); page.setAttribute('aria-label', 'AI 語音設定');
-    page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 語音設定</h1><p class="sub">情境設定庫 · 通話統一在 AI 語音對話</p></div><button type="button" data-use>前往對話</button></header>' +
+    page.innerHTML = '<header><button type="button" data-close>← 返回系統</button><div><h1>AI 語音設定</h1><p class="sub">情境設定庫 · 通話統一在 AI情境模擬</p></div><button type="button" data-use>前往對話</button></header>' +
       // 情境庫、名稱、模型收成頂端一列工具列，下面全部設定分組卡片依螢幕寬度排成多欄。
       '<div class="scenario-layout"><div class="scenario-toolbar"><label class="tb-library">情境<select data-library aria-label="已儲存的情境"></select></label>' +
       '<label class="tb-name">名稱<input data-name maxlength="80" placeholder="例如：溫柔老師、產品問答"></label>' +
@@ -27,7 +27,7 @@
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
       '<div class="scenario-cols" data-groups></div><label class="material-field" data-material-field><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea><small class="count-line" data-count></small></label>' +
       '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
-      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">只開放 DR136／DR252，所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
+      '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">設定管理只開放 DR136／DR252；學員須有分頁權限、情境授權及剩餘次數，每次最多 5 分鐘。所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
     const find = sel => page.querySelector(sel), controls = {}, output = {}, switches = {}, marks = {};
     const name = find('[data-name]'), model = find('[data-model]'), material = find('[data-material]'), library = find('[data-library]');
@@ -38,6 +38,12 @@
     const modelLabel = document.createElement('label'); modelLabel.className = 'scenario-picker'; modelLabel.append(document.createTextNode('模型'), callModel);
     const picker = document.createElement('div'); picker.className = 'scenario-call-pickers'; picker.append(label, modelLabel);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
+    const quota = document.createElement('div'); quota.className = 'scenario-quota';
+    const quotaText = document.createElement('span'); quotaText.setAttribute('role', 'status');
+    const refresh = document.createElement('button'); refresh.type = 'button'; refresh.textContent = '更新剩餘次數';
+    refresh.onclick = () => { if (!busy && discard()) load(true); }; quota.append(quotaText, refresh);
+    const access = new window.DFAIScenarioAccess(hooks.accessRpc);
+    find('.scenario-editor').prepend(access.element);
     const groups = new Map();
     // 每格走哪條路：api＝打包進連線設定，prompt＝串成文字唸給模型，local＝只在瀏覽器／後端生效。
     const kindText = {
@@ -168,8 +174,8 @@
       try { const result = await hooks.rpc({ action: 'marks', marks: list }); if (seq === markSeq) { applyMarks(result.marks); message('已記住要刪除的項目：' + list.length + ' 項'); } }
       catch (error) { if (seq === markSeq) message('刪除標記沒存到：' + error.message, true); }
     }
-    function all() { const list = builtins.filter(b => hidden.indexOf(b.id) < 0).concat(items); return list.length ? list : [builtins[0]]; }
-    function first() { return all()[0].id; }
+    function all() { const list = (allowBuiltins ? builtins.filter(b => hidden.indexOf(b.id) < 0) : []).concat(items); return list.length || !allowBuiltins ? list : [builtins[0]]; }
+    function first() { return all().length ? all()[0].id : ''; }
     function deletable() { return !!editingId || (/^builtin-/.test(viewingId) && all().length > 1); }
     function current() { return all().find(item => item.id === selectedId) || all()[0]; }
     function message(text, error) { find('[data-message]').textContent = text; find('[data-message]').classList.toggle('error', !!error); }
@@ -228,6 +234,7 @@
     }
     function changed() { dirty = true; message('尚未儲存 · 對話仍使用上次儲存的設定'); updateInstruction(); hooks.activity(); }
     function fill(scene, id, rev) {
+      access.select(id);
       name.value = scene.name; model.value = scene.model; material.value = scene.material;
       S.fields.forEach(f => { controls[f.key].value = scene.settings[f.key]; if (output[f.key]) output[f.key].value = scene.settings[f.key]; });
       Object.keys(switches).forEach(key => { switches[key].checked = (scene.off || []).indexOf(key) < 0; });
@@ -236,19 +243,25 @@
       message(editingId ? '已載入 · 修改後記得儲存' : '這是新草稿 · 儲存後就能在對話頁選用');
     }
     function show(item) {
+      if (!item || item.shared) return;
       viewingId = item.id; library.value = item.id;
       fill(item.scene, item.id.startsWith('builtin-') ? '' : item.id, item.revision);
     }
     function viewing() { return viewingId ? all().find(x => x.id === viewingId) || current() : null; }
-    function discard() { return !dirty || window.confirm('這份情境有尚未儲存的修改，要捨棄修改嗎？'); }
+    function discard() { return !(dirty || access.dirty) || window.confirm('這份情境或額度有尚未儲存的修改，要捨棄修改嗎？'); }
     function choices() {
-      [selector, library].forEach(el => { el.replaceChildren(); all().forEach(item => el.add(new Option(item.scene.name + (item.id.startsWith('builtin-') ? ' · 內建' : ''), item.id))); });
+      [selector, library].forEach(el => { el.replaceChildren(); all().filter(item => el !== library || !item.shared).forEach(item => el.add(new Option(item.scene.name + (item.shared ? ' · 剩餘 ' + item.remaining + ' 次' : item.id.startsWith('builtin-') ? ' · 內建' : ''), item.id))); });
       selector.value = selectedId; library.value = viewingId || editingId || selectedId;
-      callModel.value = current().scene.model;
+      callModel.value = current() ? current().scene.model : general.model;
+      callModel.disabled = busy || loading || !current() || !!current().shared;
       describe();
-      if (hooks.change) hooks.change(current().scene);
+      if (hooks.change) hooks.change(current() ? current().scene : general);
     }
     function describe() {
+      const item = current();
+      quota.hidden = allowBuiltins && (!item || !item.shared);
+      quotaText.textContent = !item ? '目前沒有獲准使用的情境，請聯絡管理者。' : item.shared ? item.scene.name + ' · 剩餘 ' + item.remaining + ' 次，每次 5 分鐘；中斷仍扣 1 次。' : '';
+      if (!item) { info.textContent = ''; return; }
       info.textContent = current().scene.name + ' · ' + (current().scene.material ? '含教材' : '無教材') + ' · ' +
         (callModel.value === 'gpt-live-1' ? 'GPT-Live：聲音與教材送至 OpenAI；US$0.05／分鐘，推理另計；自動接話與插話' : 'Gemini：聲音與教材送至 Google');
     }
@@ -257,7 +270,8 @@
       loading = value;
       page.querySelectorAll('input,select,textarea,button').forEach(el => { if (!el.matches('[data-close]')) el.disabled = value; });
       selector.disabled = value || busy;
-      callModel.disabled = value || busy;
+      callModel.disabled = value || busy || !current() || !!current().shared;
+      refresh.disabled = value || busy;
       find('[data-delete]').disabled = value || !deletable(); updateInstruction();
       notes.lock(value);
     }
@@ -265,14 +279,15 @@
       if (loaded && !force) return;
       const version = ++generation; lock(true); info.textContent = '正在載入帳號情境…';
       try {
-        const result = await hooks.rpc({ action: 'list' });
+        const result = await hooks.rpc({ action: 'available' });
         if (version !== generation) return;
-        items = result.items.map(item => ({ id: item.id, revision: item.revision, scene: S.normalize(item.scene) })); hidden = result.hidden || []; applyMarks(result.marks);
+        allowBuiltins = result.allowBuiltins !== false;
+        items = result.items.map(item => Object.assign({}, item, { scene: S.normalize(item.scene) })); hidden = result.hidden || []; applyMarks(result.marks);
         if (!all().some(item => item.id === selectedId)) selectedId = first();
         if (viewingId && !all().some(item => item.id === viewingId)) viewingId = selectedId;
         loaded = true; choices();
-        if (!dirty || force) { const item = viewing(); if (item) show(item); }
-      } catch (error) { if (version === generation) { message(error.message, true); info.textContent = '情境庫載入失敗，可重新載入'; } }
+        if ((!dirty && !access.dirty) || force === true) { const item = viewing(); if (item) show(item); }
+      } catch (error) { if (version === generation) { loaded = false; allowBuiltins = false; items = []; choices(); message(error.message, true); quotaText.textContent = '情境載入失敗，請按更新剩餘次數重試。'; info.textContent = error.message; } }
       finally { if (version === generation) lock(false); }
     }
     async function save(use) {
@@ -293,8 +308,8 @@
       if (!discard()) { library.value = viewingId || editingId || selectedId; return; }
       show(all().find(x => x.id === library.value));
     };
-    page.addEventListener('input', event => { if (event.target.matches('input,textarea') && !event.target.matches('[data-mark],[data-hints]')) changed(); });
-    page.addEventListener('change', event => { if (event.target !== library && event.target.matches('select')) changed(); });
+    page.addEventListener('input', event => { if (!event.target.closest('[data-access]') && event.target.matches('input,textarea') && !event.target.matches('[data-mark],[data-hints]')) changed(); });
+    page.addEventListener('change', event => { if (!event.target.closest('[data-access]') && event.target !== library && event.target.matches('select')) changed(); });
     find('[data-new]').onclick = () => { if (discard()) { viewingId = ''; fill(S.defaults()); } };
     find('[data-copy]').onclick = () => { try { const scene = read(); scene.name = (scene.name + ' 副本').slice(0, 80); viewingId = ''; fill(scene); dirty = true; message('已複製成新草稿，請儲存'); } catch (error) { message(error.message, true); } };
     find('[data-reload]').onclick = () => { if (discard()) load(true); };
@@ -332,11 +347,14 @@
       } catch (error) { message('無法匯入：' + error.message, true); }
     }; });
     choices(); fill(general);
-    return { page, selector, picker, info, load, current: () => S.normalize(Object.assign({}, current().scene, { model: callModel.value })),
+    return { page, selector, picker, info, quota, load, current: () => S.normalize(Object.assign({}, current() ? current().scene : general, { model: callModel.value || general.model })),
+      selected: () => current(),
+      get canStart() { return loaded && !loading && !!current() && (!current().shared || current().remaining > 0); },
+      consumed: ticket => { const item = items.find(x => x.id === ticket.sceneId); if (item && Number.isInteger(ticket.remaining)) { item.remaining = ticket.remaining; choices(); } },
       get loading() { return loading; },
       edit: () => { notes.load(); if (!dirty) { const item = viewing(); if (item) show(item); } },
-      lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading; },
-      reset: () => { generation++; notes.reset(); items = []; hidden = []; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
+      lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading || !current() || !!current().shared; refresh.disabled = busy || loading; },
+      reset: () => { generation++; notes.reset(); items = []; hidden = []; allowBuiltins = true; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };
   };
