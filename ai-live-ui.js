@@ -16,7 +16,7 @@
   compactCss.rel = 'stylesheet'; compactCss.href = new URL('ai-live-compact.css?v=20260922-3', assetBase).href;
   shadow.appendChild(compactCss);
   const scenarioCss = document.createElement('link');
-  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260930-1', assetBase).href;
+  scenarioCss.rel = 'stylesheet'; scenarioCss.href = new URL('ai-scenarios.css?v=20260930-2', assetBase).href;
   shadow.appendChild(scenarioCss);
   if (embedded) {
     const embeddedCss = document.createElement('link'); embeddedCss.rel = 'stylesheet';
@@ -300,7 +300,7 @@
     view.start.addEventListener('click', async () => {
       if (view.busy || current !== view) return;
       if (scenarios.loading) { status(view, '情境載入中，請稍候'); return; }
-      if (!scenarios.canStart) { status(view, '沒有可用情境或額度已用完，請更新剩餘次數或聯絡管理者', true); return; }
+      if (!scenarios.canStart) { status(view, '沒有可用情境或額度已用完，請重新進入本頁或聯絡管理者', true); return; }
       const scene = scenarios.current(), selected = scenarios.selected();
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
@@ -375,7 +375,7 @@
     view.manual.hidden = true; view.manual.textContent = '開始說話';
     view.manual.onclick = () => { if (view.client.manualTurn()) controls(view, true, true); activity(); };
     page.querySelector('.controls').prepend(view.manual);
-    page.querySelector('header').after(scenarios.picker, scenarios.info, scenarios.quota);
+    page.querySelector('header').after(scenarios.picker, scenarios.info);
     view.compact = window.DFAIHeart(view, view.compact);
     if (window.DFAILab) view.lab = window.DFAILab(view);
     empty(); status(view, view.status.textContent);

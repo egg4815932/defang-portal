@@ -38,10 +38,6 @@
     const modelLabel = document.createElement('label'); modelLabel.className = 'scenario-picker'; modelLabel.append(document.createTextNode('模型'), callModel);
     const picker = document.createElement('div'); picker.className = 'scenario-call-pickers'; picker.append(label, modelLabel);
     const info = document.createElement('p'); info.className = 'note scenario-info'; info.setAttribute('role', 'status');
-    const quota = document.createElement('div'); quota.className = 'scenario-quota';
-    const quotaText = document.createElement('span'); quotaText.setAttribute('role', 'status');
-    const refresh = document.createElement('button'); refresh.type = 'button'; refresh.textContent = '更新剩餘次數';
-    refresh.onclick = () => { if (!busy && discard()) load(true); }; quota.append(quotaText, refresh);
     const access = new window.DFAIScenarioAccess(hooks.accessRpc);
     find('.scenario-editor').prepend(access.element);
     const groups = new Map();
@@ -259,8 +255,6 @@
     }
     function describe() {
       const item = current();
-      quota.hidden = allowBuiltins && (!item || !item.shared);
-      quotaText.textContent = !item ? '目前沒有獲准使用的情境，請聯絡管理者。' : item.shared ? item.scene.name + ' · 剩餘 ' + item.remaining + ' 次，每次 5 分鐘；中斷仍扣 1 次。' : '';
       if (!item) { info.textContent = ''; return; }
       info.textContent = current().scene.name + ' · ' + (current().scene.material ? '含教材' : '無教材') + ' · ' +
         (callModel.value === 'gpt-live-1' ? 'GPT-Live：聲音與教材送至 OpenAI；US$0.05／分鐘，推理另計；自動接話與插話' : 'Gemini：聲音與教材送至 Google');
@@ -271,7 +265,6 @@
       page.querySelectorAll('input,select,textarea,button').forEach(el => { if (!el.matches('[data-close]')) el.disabled = value; });
       selector.disabled = value || busy;
       callModel.disabled = value || busy || !current() || !!current().shared;
-      refresh.disabled = value || busy;
       find('[data-delete]').disabled = value || !deletable(); updateInstruction();
       notes.lock(value);
     }
@@ -287,7 +280,7 @@
         if (viewingId && !all().some(item => item.id === viewingId)) viewingId = selectedId;
         loaded = true; choices();
         if ((!dirty && !access.dirty) || force === true) { const item = viewing(); if (item) show(item); }
-      } catch (error) { if (version === generation) { loaded = false; allowBuiltins = false; items = []; choices(); message(error.message, true); quotaText.textContent = '情境載入失敗，請按更新剩餘次數重試。'; info.textContent = error.message; } }
+      } catch (error) { if (version === generation) { loaded = false; allowBuiltins = false; items = []; choices(); message(error.message, true); info.textContent = error.message; } }
       finally { if (version === generation) lock(false); }
     }
     async function save(use) {
@@ -347,13 +340,13 @@
       } catch (error) { message('無法匯入：' + error.message, true); }
     }; });
     choices(); fill(general);
-    return { page, selector, picker, info, quota, load, current: () => S.normalize(Object.assign({}, current() ? current().scene : general, { model: callModel.value || general.model })),
+    return { page, selector, picker, info, load, current: () => S.normalize(Object.assign({}, current() ? current().scene : general, { model: callModel.value || general.model })),
       selected: () => current(),
       get canStart() { return loaded && !loading && !!current() && (!current().shared || current().remaining > 0); },
       consumed: ticket => { const item = items.find(x => x.id === ticket.sceneId); if (item && Number.isInteger(ticket.remaining)) { item.remaining = ticket.remaining; choices(); } },
       get loading() { return loading; },
       edit: () => { notes.load(); if (!dirty) { const item = viewing(); if (item) show(item); } },
-      lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading || !current() || !!current().shared; refresh.disabled = busy || loading; },
+      lock: value => { busy = value; selector.disabled = busy || loading; callModel.disabled = busy || loading || !current() || !!current().shared; },
       reset: () => { generation++; notes.reset(); items = []; hidden = []; allowBuiltins = true; selectedId = builtins[0].id; viewingId = selectedId; loaded = false; loading = false; dirty = false; choices(); fill(general); lock(false); },
       close: () => { /* 草稿留在本頁記憶體，登出 reset 才清除。 */ }
     };
