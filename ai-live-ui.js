@@ -305,7 +305,7 @@
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini', model: scene.model });
-      // 兩種模型送的都是同一份「AI 開場白」導演稿（附角色與語氣），沒打勾時 delivery 回 none。
+      // Gemini 送完整開場導演稿；GPT-Live 的導演稿已在建立指令，只補短觸發訊息，沒打勾時 delivery 回 none。
       // turn＝Gemini 當成一句話送進去；system＝GPT-Live：官方說開場寫在建立指令裡不會讓它先開口，要接通後再插一句應用指令。
       const delivered = window.DFAISchema.delivery(scene), opening = delivered.opening;
       view.sessionGreeting = delivered.cue;

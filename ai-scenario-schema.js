@@ -173,7 +173,7 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
-  // AI 開場白的導演稿：GPT-Live 的插話、Gemini 的第一句、Gemini 大腦的開場請求都用這一份。
+  // AI 開場白的導演稿：GPT-Live 建立指令、Gemini 第一句與 Gemini 大腦的開場請求共用。
   // 只丟台詞，模型會像念稿一樣平平地唸；要附上角色與語氣，請它演出來。
   function greeting(scene) {
     var s = scene.settings, off = scene.off || [];
@@ -195,7 +195,9 @@ var DFAISchema = (function () {
       parts: parts,
       text: parts.map(function (p) { return p.text; }).join('\n'),
       // system：GPT-Live 接通後插一句應用指令；turn：Gemini 新通話時當成一句話送出；none：不自動開場。
-      opening: !cue ? 'none' : (openai ? 'system' : 'turn'), cue: cue
+      opening: !cue ? 'none' : (openai ? 'system' : 'turn'),
+      // GPT-Live append 每則限 500 token；完整角色、語氣及台詞已在上方建立指令，不可再重送長文。
+      cue: cue && openai ? '現在立即依照本次會話指令中的角色、語氣、語言與開場白先開口。把開場白當成自己的台詞自然演出，不要念稿或轉述；說完停下來等使用者回話。' : cue
     };
   }
   return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, greeting: greeting, defaults: defaults, migrate: migrate };
