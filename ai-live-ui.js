@@ -302,6 +302,8 @@
       if (scenarios.loading) { status(view, '情境載入中，請稍候'); return; }
       if (!scenarios.canStart) { status(view, '沒有可用情境或額度已用完，請重新進入本頁或聯絡管理者', true); return; }
       const scene = scenarios.current(), selected = scenarios.selected();
+      try { window.DFAISchema.validateOpening(scene); }
+      catch (error) { status(view, error.message, true); return; }
       if (scene.settings.requireMaterial === 'on' && !scene.material) { status(view, '此情境需要教材，請到情境設定加入並儲存', true); return; }
       if (!view.settings.valid()) return;
       view.sessionSettings = Object.assign({}, scene.settings, { provider: scene.model === 'gpt-live-1' ? 'openai' : 'gemini', model: scene.model });

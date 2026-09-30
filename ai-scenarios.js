@@ -26,7 +26,7 @@
       '<span><span class="field-badge badge-prompt">指令</span>寫進說明書，模型盡量照做</span>' +
       '<span><span class="field-badge badge-local">本機</span>只在你這邊生效，模型看不到</span></div>' +
       '<div class="scenario-cols" data-groups></div><label class="material-field" data-material-field><span class="field-title">一起儲存的教材<span class="field-badge badge-prompt" title="文字指令：教材會包成 &lt;教材&gt; 區塊，接在指令後面送出。">指令</span></span><textarea data-material maxlength="12000" placeholder="貼上教材；沒有教材也可以建立一般對話情境"></textarea><small class="count-line" data-count></small></label>' +
-      '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><pre data-instruction></pre></details>' +
+      '<details class="scenario-group"><summary>完整送出指令</summary><p class="note" data-instruction-note></p><h3>1. 建立通話時</h3><pre data-instruction></pre><h3>2. 接通後補送一次</h3><pre data-opening-instruction></pre><p class="note" data-opening-limit></p><h3>3. 時間到才送</h3><p class="note" data-nudge-note></p><pre data-nudge-instruction></pre><div data-brain-instructions><h3>大腦的系統指令</h3><pre data-brain-instruction></pre><div data-brain-opening-block><h3>Gemini 大腦的開場請求</h3><pre data-brain-opening></pre></div></div></details>' +
       '<details class="scenario-group"><summary>系統固定限制</summary><p class="note">設定管理只開放 DR136／DR252；學員須有分頁權限、情境授權及剩餘次數，每次最多 5 分鐘。所有讀寫先驗證登入。API Key 只留後端；票證只開一個新會話，模型與指令等欄位會鎖定。回覆為語音；Gemini 使用 16／24 kHz PCM，GPT-Live 使用 WebRTC。每分鐘最多 6 次取票、通話最長 30 分鐘、教材最多 12,000 字。GPT-Live 可依情境開關網路搜尋；Gemini 沒有搜尋。兩者都沒有操作內部系統的工具，改寫指令不會新增權限。這些不是情境可解除的限制。</p></details></div></div>' +
       '<footer class="scenario-footer"><p role="status" data-message>正在載入情境…</p><button type="button" data-delete>刪除</button><button type="button" class="primary" data-save>儲存情境</button><button type="button" data-save-use>儲存並套用</button></footer>';
     const find = sel => page.querySelector(sel), controls = {}, output = {}, switches = {}, marks = {};
@@ -181,13 +181,12 @@
       const off = Object.keys(switches).filter(key => !switches[key].checked);
       return S.normalize({ name: name.value, model: model.value, material: material.value, settings, off });
     }
-    // 預覽必須跟後端送出的字串同源：標底色的段落是後端固定補的，情境改不到。
+    // 每個送出時機分開列出，與實際通話使用相同函式；文字段落都能在上方修改。
     function renderInstruction(scene) {
-      const plan = S.delivery(scene), pre = find('[data-instruction]'), fixed = plan.parts.some(p => p.fixed);
+      const plan = S.delivery(scene), pre = find('[data-instruction]');
       pre.replaceChildren();
       plan.parts.forEach((part, i) => {
         const span = document.createElement('span');
-        if (part.fixed) span.className = 'instruction-fixed';
         span.textContent = (i ? '\n' : '') + part.text;
         pre.append(span);
       });
@@ -196,7 +195,21 @@
       const override = !dirty && viewingId === selectedId && callModel.value !== scene.model
         ? '對話頁本次通話模型選的是「' + label(callModel.value) + '」，真正通話會照那個模型的版本送出。' : '';
       find('[data-instruction-note]').textContent = '本次模型：' + label(scene.model) +
-        '。下面就是語音模型收到的完整系統指令' + (fixed ? '；標底色那幾行是後端固定補的，情境改不到。' : '，這個模型沒有後端另外補的段落。') + override;
+        '。以下按送出時間列出實際文字；上方欄位可修改或取消送出。{開場白} 會換成完整台詞，不另加開場句或偷偷截字。' + override;
+      find('[data-opening-instruction]').textContent = plan.cue || '不送出';
+      const openai = scene.model === 'gpt-live-1';
+      const limit = find('[data-opening-limit]');
+      limit.textContent = openai && plan.cue ? 'GPT 補送內容：' + S.appendBytes(plan.cue) + ' / 500 位元組（保守長度限制，避免超過 API 上限）。' : '';
+      limit.classList.remove('error');
+      try { S.validateOpening(scene); } catch (error) { limit.textContent += ' ' + error.message; limit.classList.add('error'); }
+      const nudge = scene.settings.nudgeMinutes > 0 && !(scene.off || []).includes('nudgeText') && scene.settings.nudgeText;
+      find('[data-nudge-note]').textContent = nudge ? '通話第 ' + scene.settings.nudgeMinutes + ' 分鐘送出一次；若通話已結束則不送。' : '';
+      find('[data-nudge-instruction]').textContent = nudge || '不送出';
+      find('[data-brain-instructions]').hidden = !openai;
+      find('[data-brain-instruction]').textContent = openai ? S.instruction(scene) : '';
+      const ownBrain = openai && S.geminiBrains.includes(scene.settings.openaiBrain);
+      find('[data-brain-opening-block]').hidden = !ownBrain;
+      find('[data-brain-opening]').textContent = ownBrain ? S.greeting(scene) || '不送出' : '';
     }
     function updateInstruction() {
       const openai = model.value === 'gpt-live-1';
@@ -207,7 +220,7 @@
       activeVoice.closest('label').after(notesBox);
       notes.select((openai ? 'openai:' : '') + activeVoice.value);
       ['automatic', 'detection', 'endSensitivity', 'prefixMs', 'pauseMs', 'interruption', 'thinking', 'resumption', 'compression', 'reconnects', 'startSeconds', 'timeoutSeconds'].forEach(k => { controls[k].closest('label').hidden = openai; });
-      ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch', 'openaiLab'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
+      ['openaiBrain', 'openaiEffort', 'openaiMaxTokens', 'openaiWebSearch', 'openaiLab', 'openaiOpeningRule', 'waitingRule'].forEach(k => { if (controls[k]) controls[k].closest('label').hidden = !openai; });
       Object.keys(switches).forEach(key => {
         const on = switches[key].checked;
         controls[key].disabled = loading || !on;
@@ -219,6 +232,7 @@
       catch (error) {
         find('[data-instruction]').textContent = error.message;
         find('[data-instruction-note]').textContent = '';
+        ['[data-opening-instruction]', '[data-opening-limit]', '[data-nudge-note]', '[data-nudge-instruction]', '[data-brain-instruction]', '[data-brain-opening]'].forEach(sel => { find(sel).textContent = ''; });
       }
       find('[data-count]').textContent = material.value.length.toLocaleString() + ' / ' + output.materialLimit.value + ' 字';
       controls.thinking.disabled = loading || model.value !== 'gemini-3.8-live-extended-thinking';

@@ -56,6 +56,9 @@ var DFAISchema = (function () {
   text('teachingRule', '教學補充規則', '教學', '講解分小段，等學員回答後再給回饋。使用者明確要求切換教學方式時，依當次要求調整。');
   choice('autoGreeting', '接通後 AI 先開口', '通話流程', onoff, 'on');
   text('opening', 'AI 開場白', '通話流程', OPENING, 2000, '接通後 AI 先說這句，會照「說話風格」裡的角色與語氣說出來，不是照稿念；接回原對話不重說。');
+  text('openingRule', '開場方式指令', '開場指令（可修改）', '通話一接通就由你先開口，說出這句開場白：「{開場白}」。依照本次設定的角色與語氣，把它當成自己的台詞自然演出，不要念稿或轉述；說完等使用者回話。', 2000, '這段就是開場時給 AI 的指令，可修改、留白或取消送出。{開場白} 會換成你填的完整台詞。GPT 在建立通話時送出；Gemini 在接通後送出。');
+  text('openaiOpeningRule', 'GPT 接通補送指令', '開場指令（可修改）', '現在先開口。開場白：「{開場白}」。沿用開場白的語言；中文用台灣中文，不要自行切換英文。完整台詞、角色與語氣依本次會話設定，自然演出；說完等對方回話。', 2000, '只適用 GPT。接通後會額外送出這格內容，整通只送一次。{開場白} 會換成完整台詞，不截字。可修改、留白或取消送出；下方「完整送出指令」列出實際內容。太長會擋下開始，請縮短這格，或移除 {開場白} 改寫成「依設定的開場白」。');
+  text('waitingRule', '不自動開場時的指令', '開場指令（可修改）', '連線後先等待使用者說話，不主動開場。', 2000, '只適用 GPT。不自動開場時，建立通話會加上這段。可修改、留白或取消送出；不會另補固定句子。');
   choice('requireMaterial', '開始前必須有教材', '教材', onoff, 'off');
   range('materialLimit', '這個情境的教材字數上限', '教材', 500, 12000, 500, 12000, '字', '系統最高 12,000 字。');
   choice('automatic', '說話分段方式', '收音與接話', [['on', 'AI 自動判斷'], ['off', '手動按「開始說話／送出」']], 'on', '手動模式只在按下開始說話後送聲音，送出時結束這一段。');
@@ -173,21 +176,26 @@ var DFAISchema = (function () {
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
   }
-  // AI 開場白的導演稿：GPT-Live 建立指令、Gemini 第一句與 Gemini 大腦的開場請求共用。
-  // 只丟台詞，模型會像念稿一樣平平地唸；要附上角色與語氣，請它演出來。
+  // 額外開場文字也來自可編輯欄位；只展開已公開的佔位字，不截斷或補寫內容。
+  function openingText(scene, key) {
+    if ((scene.off || []).indexOf(key) >= 0) return '';
+    return scene.settings[key].replace(/\{開場白\}/g, function () { return scene.settings.opening; });
+  }
   function greeting(scene) {
     var s = scene.settings, off = scene.off || [];
     if (s.autoGreeting !== 'on' || off.indexOf('autoGreeting') >= 0 || off.indexOf('opening') >= 0 || !s.opening) return '';
-    var style = [off.indexOf('roleRule') < 0 && s.roleRule ? '角色：' + s.roleRule : '', off.indexOf('toneRule') < 0 && s.toneRule ? '語氣：' + s.toneRule : ''].filter(Boolean).join('；');
-    return '通話一接通就由你先開口，說出這句開場白：「' + s.opening + '」。' + (style ? '照你設定的' + style + '。' : '') +
-      '把它當成你自己的台詞、帶著這個語氣演出來，不要像在念稿或轉述。說完就停下來，等使用者回話。';
+    return openingText(scene, 'openingRule');
   }
-  // 開場觸發要帶可辨識語言的台詞；長台詞只附開頭，完整版仍在建立指令。
-  // 最多 48 個 Unicode 字元，即使全為 4-byte 字元，整則仍小於 500 UTF-8 bytes。
-  function openingTrigger(scene) {
-    var opening = scene.settings.opening, lead = Array.from(opening).slice(0, 48).join('');
-    return '現在先開口。開場白' + (lead === opening ? '' : '開頭') + '：「' + lead + '」。' +
-      '沿用開場白的語言；中文用台灣中文，不要自行切換英文。完整台詞、角色與語氣依本次會話設定，自然演出；說完等對方回話。';
+  function appendBytes(text) {
+    return Array.from(text).reduce(function (sum, ch) {
+      var n = ch.codePointAt(0); return sum + (n > 65535 ? 4 : n > 2047 ? 3 : n > 127 ? 2 : 1);
+    }, 0);
+  }
+  function validateOpening(scene) {
+    // 只在開始通話時驗證，不讓舊的長開場情境無法載入／編輯。
+    if (scene.model === 'gpt-live-1' && appendBytes(delivery(scene).cue) > 500) {
+      throw new Error('GPT 接通補送指令太長，請在 AI 語音設定縮短這格，或移除 {開場白} 改寫成「依設定的開場白」。內容不會自動截短。');
+    }
   }
   // 真正送到語音模型的那一份：後端固定補的段落也列在這裡，設定頁預覽與 GAS 共用同一個來源。
   function delivery(scene) {
@@ -196,16 +204,17 @@ var DFAISchema = (function () {
     var cue = greeting(scene);
     var parts = [{ text: instruction(scene), fixed: false }];
     if (openai) {
-      parts.push({ text: cue || '連線後先等待使用者說話，不主動開場。', fixed: true });
+      var extra = cue || openingText(scene, 'waitingRule');
+      if (extra) parts.push({ text: extra, fixed: false });
     }
+    var start = cue && openai ? openingText(scene, 'openaiOpeningRule') : cue;
     return {
       parts: parts,
       text: parts.map(function (p) { return p.text; }).join('\n'),
       // system：GPT-Live 接通後插一句應用指令；turn：Gemini 新通話時當成一句話送出；none：不自動開場。
-      opening: !cue ? 'none' : (openai ? 'system' : 'turn'),
-      // GPT-Live append 每則限 500 token；完整角色、語氣及台詞已在上方建立指令，不可再重送長文。
-      cue: cue && openai ? openingTrigger(scene) : cue
+      opening: !start ? 'none' : (openai ? 'system' : 'turn'),
+      cue: start
     };
   }
-  return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, greeting: greeting, defaults: defaults, migrate: migrate };
+  return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, greeting: greeting, appendBytes: appendBytes, validateOpening: validateOpening, defaults: defaults, migrate: migrate };
 })();
