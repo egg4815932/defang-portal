@@ -182,6 +182,13 @@ var DFAISchema = (function () {
     return '通話一接通就由你先開口，說出這句開場白：「' + s.opening + '」。' + (style ? '照你設定的' + style + '。' : '') +
       '把它當成你自己的台詞、帶著這個語氣演出來，不要像在念稿或轉述。說完就停下來，等使用者回話。';
   }
+  // 開場觸發要帶可辨識語言的台詞；長台詞只附開頭，完整版仍在建立指令。
+  // 最多 48 個 Unicode 字元，即使全為 4-byte 字元，整則仍小於 500 UTF-8 bytes。
+  function openingTrigger(scene) {
+    var opening = scene.settings.opening, lead = Array.from(opening).slice(0, 48).join('');
+    return '現在先開口。開場白' + (lead === opening ? '' : '開頭') + '：「' + lead + '」。' +
+      '沿用開場白的語言；中文用台灣中文，不要自行切換英文。完整台詞、角色與語氣依本次會話設定，自然演出；說完等對方回話。';
+  }
   // 真正送到語音模型的那一份：後端固定補的段落也列在這裡，設定頁預覽與 GAS 共用同一個來源。
   function delivery(scene) {
     var s = scene.settings, off = scene.off || [], openai = scene.model === 'gpt-live-1';
@@ -197,7 +204,7 @@ var DFAISchema = (function () {
       // system：GPT-Live 接通後插一句應用指令；turn：Gemini 新通話時當成一句話送出；none：不自動開場。
       opening: !cue ? 'none' : (openai ? 'system' : 'turn'),
       // GPT-Live append 每則限 500 token；完整角色、語氣及台詞已在上方建立指令，不可再重送長文。
-      cue: cue && openai ? '現在立即依照本次會話指令中的角色、語氣、語言與開場白先開口。把開場白當成自己的台詞自然演出，不要念稿或轉述；說完停下來等使用者回話。' : cue
+      cue: cue && openai ? openingTrigger(scene) : cue
     };
   }
   return { fields: fields, voices: voices, openaiVoices: openaiVoices, geminiBrains: geminiBrains, normalize: normalize, instruction: instruction, delivery: delivery, greeting: greeting, defaults: defaults, migrate: migrate };
