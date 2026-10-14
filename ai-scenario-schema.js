@@ -56,7 +56,6 @@ var DFAISchema = (function () {
   text('teachingRule', '教學補充規則', '教學', '講解分小段，等學員回答後再給回饋。使用者明確要求切換教學方式時，依當次要求調整。');
   choice('autoGreeting', '接通後 AI 先開口', '通話流程', onoff, 'on');
   text('opening', 'AI 開場白', '通話流程', OPENING, 2000, '接通後 AI 先說這句，會照「說話風格」裡的角色與語氣說出來，不是照稿念；接回原對話不重說。');
-  text('openingRule', '開場方式指令', '開場指令（可修改）', '通話一接通就由你先開口，說出這句開場白：「{開場白}」。依照本次設定的角色與語氣，把它當成自己的台詞自然演出，不要念稿或轉述；說完等使用者回話。', 2000, '這段就是開場時給 AI 的指令，可修改、留白或取消送出。{開場白} 會換成你填的完整台詞。GPT 在建立通話時送出；Gemini 在接通後送出。');
   text('openaiOpeningRule', 'GPT 接通補送指令', '開場指令（可修改）', '現在先開口。開場白：「{開場白}」。沿用開場白的語言；中文用台灣中文，不要自行切換英文。完整台詞、角色與語氣依本次會話設定，自然演出；說完等對方回話。', 2000, '只適用 GPT。接通後會額外送出這格內容，整通只送一次。{開場白} 會換成完整台詞，不截字。可修改、留白或取消送出；下方「完整送出指令」列出實際內容。太長會擋下開始，請縮短這格，或移除 {開場白} 改寫成「依設定的開場白」。');
   text('waitingRule', '不自動開場時的指令', '開場指令（可修改）', '連線後先等待使用者說話，不主動開場。', 2000, '只適用 GPT。不自動開場時，建立通話會加上這段。可修改、留白或取消送出；不會另補固定句子。');
   choice('requireMaterial', '開始前必須有教材', '教材', onoff, 'off');
@@ -184,7 +183,8 @@ var DFAISchema = (function () {
   function greeting(scene) {
     var s = scene.settings, off = scene.off || [];
     if (s.autoGreeting !== 'on' || off.indexOf('autoGreeting') >= 0 || off.indexOf('opening') >= 0 || !s.opening) return '';
-    return openingText(scene, 'openingRule');
+    // 只標示使用者填寫的台詞；已移除的 openingRule 與舊勾選不再控制開場。
+    return 'AI 開場白：' + s.opening;
   }
   function appendBytes(text) {
     return Array.from(text).reduce(function (sum, ch) {
