@@ -184,7 +184,7 @@
         run.ticket = result;
         // 只有情境選了 Gemini 大腦時，後端才會回 ownBrain；OpenAI 大腦這裡永遠是 null。
         if (result && result.ownBrain && root.DFBrainClient) run.brain = new root.DFBrainClient(getTicket, message => this.emit('state', message));
-        run.expiry = setTimeout(() => this.fail(run, '本次 GPT-Live 通話已達設定期限'), Math.max(0, result.expiresAt - Date.now()));
+        run.expiry = setTimeout(() => this.fail(run, '本次 GPT-Live 通話已達設定期限', true), Math.max(0, result.expiresAt - Date.now()));
         // 雲端巡邏靠這個心跳判斷通話還活著；當機或被滑掉 APP 就沒人送，雲端會自己掛斷，不必等這裡處理。
         run.heartbeat = setInterval(() => {
           if (!current() || !run.ticket) return;
@@ -267,8 +267,8 @@
       return { id, types: ['response.item.create', 'response.create'] };
     }
     manualTurn() { return false; }
-    fail(run, message) { if (this.run !== run) return; this.stop(); this.emit('ended'); this.emit('error', message); }
-    stop() {
+    fail(run, message, expired) { if (this.run !== run) return; this.stop(expired); this.emit('ended'); this.emit('error', message); }
+    stop(expired) {
       const run = this.run; if (!run) return;
       this.run = null;
       clearInterval(run.monitor); clearTimeout(run.timeout); clearTimeout(run.expiry); clearTimeout(run.disconnectTimer); clearInterval(run.heartbeat);
@@ -277,7 +277,7 @@
       if (run.audio) { run.audio.pause(); run.audio.srcObject = null; run.audio.remove(); run.audio = null; }
       [run.input, run.meter, run.remote, run.output, run.volume, run.boost].forEach(n => { if (n) n.disconnect(); });
       if (run.boosted) run.boosted.stream.getTracks().forEach(t => t.stop());
-      if (run.context) run.context.close().catch(() => {});
+      if (run.context && !(expired === true && root.DFAIEndChime && root.DFAIEndChime(run.context))) run.context.close().catch(() => {});
       this.emit('inputLevel', { level: 0, bands: [] }); this.emit('outputLevel', { level: 0, bands: [] }); this.emit('inputState', 'idle');
       run.cleanupTransport = () => {
         clearTimeout(run.closeTimer);

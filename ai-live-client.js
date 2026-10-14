@@ -159,7 +159,7 @@
         const ticket = await getTicket();
         if (!current()) return false;
         run.ticket = ticket;
-        run.expiry = setTimeout(() => this.fail(run, '本次通話已達設定期限，請按開始建立新對話'),
+        run.expiry = setTimeout(() => this.fail(run, '本次通話已達設定期限，請按開始建立新對話', true),
           Math.max(0, ticket.expiresAt - Date.now()));
         this.connect(run, false);
         return true;
@@ -309,12 +309,12 @@
     clearAudio(run) {
       if (run.player) run.player.port.postMessage({ type: 'clear' });
     }
-    fail(run, message) {
+    fail(run, message, expired) {
       if (this.run !== run) return;
-      this.stop();
+      this.stop(expired);
       this.emit('error', message);
     }
-    stop() {
+    stop(expired) {
       const run = this.run;
       this.run = null;
       if (!run) return;
@@ -336,7 +336,7 @@
       this.emit('inputLevel', { level: 0, bands: [] });
       this.emit('outputLevel', { level: 0, bands: [] });
       this.emit('inputState', 'idle');
-      if (run.context && run.context.state !== 'closed') run.context.close().catch(function () {});
+      if (run.context && run.context.state !== 'closed' && !(expired === true && root.DFAIEndChime && root.DFAIEndChime(run.context))) run.context.close().catch(function () {});
       this.emit('ended');
     }
   }
