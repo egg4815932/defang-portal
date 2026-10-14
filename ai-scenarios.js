@@ -140,6 +140,10 @@
       if (f.key === 'voice' || f.key === 'openaiVoice') groups.get(f.group).append(notesBox);
     });
     groups.get('教材').append(find('[data-material-field]'));
+    // 通話流程與連線設定固定同欄，讓長篇角色設定保有完整的直向空間。
+    const callCard = groups.get('通話流程').parentElement, connectionCard = groups.get('連線（進階）').parentElement;
+    const callStack = document.createElement('div'); callStack.className = 'scenario-call-stack';
+    callCard.before(callStack); callStack.append(callCard, connectionCard);
     // 分組卡片排成等寬多欄，每張卡放進目前最矮的那一欄（瀑布流），寬螢幕不會留空欄。
     // 只在欄數、模型或說明開關改變時重排，打字中不搬動卡片、不會掉焦點。
     const board = find('[data-groups]'), cards = Array.from(board.children);

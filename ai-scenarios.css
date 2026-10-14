@@ -38,6 +38,7 @@
 .scenario-page:not(.show-hints) .scenario-grid small,.scenario-page:not(.show-hints) .scenario-legend,.scenario-page:not(.show-hints) .voice-notes>.note:not([data-note-status]){display:none}
 .voice-notes{display:grid;gap:4px;padding:8px;background:#e8f3ec;border-radius:10px;min-width:0;font-size:13px}.voice-notes .note{margin:0;font-size:12px}.voice-notes label{gap:2px}.voice-notes textarea{width:100%;box-sizing:border-box}.voice-notes input[data-voice-alias]{width:100%;box-sizing:border-box}.voice-note-actions{display:flex;gap:6px;flex-wrap:wrap}.voice-note-actions button{font-size:12px}.voice-notes [data-note-status]{overflow-wrap:anywhere}.voice-notes [data-note-status]:empty{display:none}
 .scenario-page textarea{flex:none;min-height:34px;max-height:200px;resize:vertical;font-size:13px;padding:6px 9px;line-height:1.55;border-radius:10px;field-sizing:content}
+.scenario-page textarea[data-setting=roleRule]{min-height:480px;max-height:none}
 .scenario-page .material-field textarea{min-height:120px;max-height:360px}
 .count-line{text-align:right}
 .scenario-page input[type=range]{accent-color:#2b7e43;min-height:26px;cursor:pointer}
