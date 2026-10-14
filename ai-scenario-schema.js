@@ -40,12 +40,8 @@ var DFAISchema = (function () {
     ['delta', '女聲', '美國南方英語口音'], ['cinder', '男聲', '美國南方英語口音']
   ]);
   choice('openaiVoice', 'GPT-Live 音色', '模型與聲音', openaiVoices.map(function (v) { return [v[0], v.join(' · ')]; }), 'marin', '依 OpenAI 官方聲音呈現與口音標示；未標示代表官方未公布。溫柔、活潑等聽感可記在下方備註，中文表現請以試聽為準。Maple 是 ChatGPT 原生音色，目前不在 GPT-Live API 公開名單中。');
-  text('accent', '口音偏好', '說話風格', '', 60);
-  text('languageRule', '語言補充規則', '說話風格', '回應語言優先於口音與教材語言。中文模式使用繁體中文與台灣慣用詞；英文單字、產品名稱、背景英語與收音不清楚都不得因此改用英文回答。優先按台灣華語理解近音詞，不清楚時先確認原意，不把雜音猜成外語。');
   range('pacePercent', '說話速度偏好', '說話風格', 50, 150, 5, 100, '%', '100% 是自然速度；寫進指令，不是播放器倍速。');
-  text('soundRule', '聲音表現規則', '說話風格', '只輸出自然說話的聲音，不要產生嗶聲、提示音、背景音樂或模仿背景雜音。');
   text('roleRule', '角色', '說話風格', '以耐心老師的方式，用簡單例子引導理解。');
-  text('toneRule', '語氣', '說話風格', '語氣自然。');
   range('sentences', '每次回答目標句數', '說話風格', 1, 20, 1, 3, '句', '文字指令：不是說到句數就切斷。');
   text('teachingAskRule', '先問講解或練習：教學細節', '教學', '先簡短詢問想聽講解還是做練習。');
   text('teachingExplainRule', '先講解：教學細節', '教學', '先分段講解，每個重點後確認理解。');
@@ -149,12 +145,10 @@ var DFAISchema = (function () {
     var questions = on('questions') ? s.questions : 0;
     var teaching = Object.keys(teachingMethods).map(function (m) { return rule(teachingMethods[m]); }).concat(
       questions > 0 ? rule('questionRule').replace(/\{題數\}/g, String(questions)) : '', rule('teachingRule')).filter(Boolean).join('\n');
-    var accent = rule('accent');
     // 語速與句數各自有勾勾；兩個都打勾才是原本那一整行。
     var pace = [on('pacePercent') ? '語速目標約為自然速度的 ' + s.pacePercent + '%。' : '',
       on('sentences') ? '每次回答目標 ' + s.sentences + ' 句。' : ''].join('');
-    return [rule('soundRule'), rule('languageRule'),
-      accent ? '口音偏好：' + JSON.stringify(accent) : '', rule('roleRule'), rule('toneRule'),
+    return [rule('roleRule'),
       pace, rule('listeningRule'), teaching, scene.material ? '<教材>\n' + scene.material + '\n</教材>' : '本次沒有提供教材。'].filter(Boolean).join('\n');
   }
   function defaults(name) { return normalize({ name: name || '新情境' }); }
@@ -164,13 +158,11 @@ var DFAISchema = (function () {
     var s = old.settings || {};
     if (old.model) out.model = old.model;
     fields.forEach(function (f) { if (f.type === 'select' && f.choices.some(function (p) { return p[0] === s[f.key]; })) out.settings[f.key] = s[f.key]; });
-    if (typeof s.accent === 'string' && s.accent.length <= 60) out.settings.accent = s.accent;
     // 預設的 off 只有沒選到的教學細節；清掉讓 normalize 依舊設定重算。
     if (s.teaching) { out.settings.teaching = s.teaching; out.off = []; }
     out.settings.pacePercent = { slow: 75, normal: 100, fast: 125 }[s.pace] || 100;
     out.settings.sentences = { brief: 3, balanced: 6, detailed: 12 }[s.length] || 3;
     out.settings.roleRule = { assistant: '以專業助理的方式，清楚協助處理問題。', teacher: '以耐心老師的方式，用簡單例子引導理解。', partner: '以友善陪練夥伴的方式互動，鼓勵使用者自己表達。' }[s.role] || out.settings.roleRule;
-    out.settings.toneRule = { natural: '語氣自然。', gentle: '語氣溫柔、有耐心。', formal: '語氣正式、禮貌。', lively: '語氣活潑、有精神，但不要過度誇張。' }[s.tone] || out.settings.toneRule;
     if (['300', '700', '1200', '1800'].indexOf(s.pause) >= 0) out.settings.pauseMs = Number(s.pause);
     out.settings.autoGreeting = mode === 'chat' ? 'off' : 'on';
     return normalize(out);
